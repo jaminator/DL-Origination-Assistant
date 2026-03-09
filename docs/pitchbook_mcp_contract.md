@@ -165,23 +165,13 @@ GET /companies/{companyId}/deals?dealType=Debt&pageSize={n}
 }
 ```
 
-#### Company Investors
+#### Company Investors (reference only — not used as standalone call)
+
+Investor data is embedded in the company detail response. A standalone
+investors endpoint exists but is not called by our adapter.
 
 ```
 GET /companies/{companyId}/investors?pageSize={n}
-```
-
-**Response:**
-```json
-{
-  "items": [
-    {
-      "investorId": "inv-001",
-      "investorName": "Growth Capital Partners",
-      "investorType": "Growth Equity"
-    }
-  ]
-}
 ```
 
 ---
@@ -263,24 +253,6 @@ Get deals for a company, optionally filtered by type.
 ```
 
 **Output:** Same as REST `GET /companies/{companyId}/deals` response.
-
-### Tool: `pitchbook_get_company_investors`
-
-Get investors for a company.
-
-**Input Schema:**
-```json
-{
-  "type": "object",
-  "properties": {
-    "companyId": { "type": "string", "description": "PitchBook company ID" },
-    "pageSize": { "type": "integer", "default": 25 }
-  },
-  "required": ["companyId"]
-}
-```
-
-**Output:** Same as REST `GET /companies/{companyId}/investors` response.
 
 ---
 

@@ -45,7 +45,6 @@ TOOL_SEARCH_COMPANIES = "pitchbook_search_companies"
 TOOL_GET_COMPANY = "pitchbook_get_company"
 TOOL_GET_COMPETITORS = "pitchbook_get_company_competitors"
 TOOL_GET_DEALS = "pitchbook_get_company_deals"
-TOOL_GET_INVESTORS = "pitchbook_get_company_investors"
 
 CONNECTOR_NAME = "pitchbook"
 

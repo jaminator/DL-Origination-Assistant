@@ -213,23 +213,6 @@ class PitchBookRESTClient(PitchBookAdapter):
             logger.warning("pitchbook_debt_failed", entity_id=entity_id, error=str(exc))
             return []
 
-    async def get_investors(self, entity_id: str) -> list[dict]:
-        """Get investors for a company.
-
-        PitchBook API v2 endpoint: ``GET /companies/{companyId}/investors``
-        """
-        try:
-            data = await self._request(
-                "GET",
-                f"/{_ENTITY_COMPANIES}/{entity_id}/investors",
-                params={"pageSize": _DEFAULT_PAGE_SIZE},
-            )
-            items = data.get("items", data.get("results", []))
-            return [_normalize_investor(i) for i in items]
-        except Exception as exc:
-            logger.warning("pitchbook_investors_failed", entity_id=entity_id, error=str(exc))
-            return []
-
     async def is_available(self) -> bool:
         return bool(self._base_url and self._api_key)
 

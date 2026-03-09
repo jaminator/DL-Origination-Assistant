@@ -13,7 +13,6 @@ from app.miner.pitchbook.rest_client import (
     _normalize_company_search_result,
     _normalize_competitor,
     _normalize_debt_deal,
-    _normalize_investor,
 )
 
 # -- Normalizer unit tests -----------------------------------------------
@@ -108,17 +107,6 @@ class TestNormalizers:
         assert deal["facility_type"] == "Term Loan"
         assert deal["amount"] == 75000000
         assert deal["lender"] == "Big Bank"
-
-    def test_normalize_investor_dict(self):
-        raw = {"investorId": "inv-1", "investorName": "GrowthCo", "investorType": "PE"}
-        inv = _normalize_investor(raw)
-        assert inv["name"] == "GrowthCo"
-        assert inv["type"] == "PE"
-
-    def test_normalize_investor_string(self):
-        inv = _normalize_investor("Simple Investor Name")
-        assert inv["name"] == "Simple Investor Name"
-        assert inv["entity_id"] == ""
 
 
 # -- Client method tests (mocked HTTP) -----------------------------------
@@ -267,24 +255,6 @@ class TestPitchBookRESTClient:
         ):
             debts = await client.get_debt_details("pb-123")
             assert debts == []
-
-    @pytest.mark.asyncio
-    async def test_get_investors(self, client):
-        mock_response = httpx.Response(
-            200,
-            json={
-                "items": [
-                    {"investorId": "inv-1", "investorName": "VC Fund", "investorType": "VC"},
-                ]
-            },
-            request=httpx.Request("GET", "https://api.pitchbook.com/v2/companies/pb-123/investors"),
-        )
-        with patch.object(
-            httpx.AsyncClient, "request", new_callable=AsyncMock, return_value=mock_response
-        ):
-            investors = await client.get_investors("pb-123")
-            assert len(investors) == 1
-            assert investors[0]["name"] == "VC Fund"
 
     @pytest.mark.asyncio
     async def test_auth_headers(self, client):
