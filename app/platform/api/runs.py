@@ -66,20 +66,40 @@ async def get_run_status(run_id: str, session: AsyncSession = Depends(get_db)):
 
 @router.post("/{run_id}/execute")
 async def execute_run(run_id: str, session: AsyncSession = Depends(get_db)):
-    """Start the borrower mining pipeline (async background job)."""
+    """Start the borrower mining pipeline (async background job, inline fallback)."""
     repo = RunRepository(session)
     run = await repo.get(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
 
+    # Try ARQ background job first
     from app.platform.jobs.tasks import enqueue_pipeline
     job_id = await enqueue_pipeline(run_id)
 
     if job_id:
         return {"status": "accepted", "job_id": job_id, "run_id": run_id}
-    else:
-        # Fallback: run inline if Redis/ARQ unavailable
-        return {"status": "accepted", "job_id": None, "run_id": run_id, "note": "Running inline (Redis unavailable)"}
+
+    # Fallback: run inline if Redis/ARQ unavailable
+    from app.ai.llm_service import get_llm_service
+    from app.miner.engine import MinerEngine
+    from app.miner.pitchbook.mcp_client import get_pitchbook_adapter
+    from app.platform.persistence.repositories import CompanyRepository, CheckpointRepository, ReviewRepository
+    from app.platform.persistence.storage import get_storage
+    from app.platform.workflow.orchestrator import WorkflowOrchestrator
+
+    llm = get_llm_service()
+    pb = get_pitchbook_adapter()
+    storage = get_storage()
+    miner = MinerEngine(llm_service=llm, pitchbook_adapter=pb, storage=storage)
+    orchestrator = WorkflowOrchestrator(
+        run_repo=repo,
+        checkpoint_repo=CheckpointRepository(session),
+        company_repo=CompanyRepository(session),
+        review_repo=ReviewRepository(session),
+        storage=storage,
+    )
+    result = await orchestrator.run_pipeline(UUID(run_id), miner_engine=miner)
+    return {"status": "completed", "run_id": run_id, "result": result}
 
 
 @router.post("/{run_id}/resume")
@@ -89,7 +109,35 @@ async def resume_run(run_id: str, session: AsyncSession = Depends(get_db)):
     run = await repo.get(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
-    return {"status": "accepted", "run_id": run_id, "note": "Resume enqueued"}
+
+    # Try ARQ first
+    from app.platform.jobs.tasks import enqueue_resume
+    job_id = await enqueue_resume(run_id)
+
+    if job_id:
+        return {"status": "accepted", "job_id": job_id, "run_id": run_id}
+
+    # Inline fallback
+    from app.ai.llm_service import get_llm_service
+    from app.miner.engine import MinerEngine
+    from app.miner.pitchbook.mcp_client import get_pitchbook_adapter
+    from app.platform.persistence.repositories import CompanyRepository, CheckpointRepository, ReviewRepository
+    from app.platform.persistence.storage import get_storage
+    from app.platform.workflow.orchestrator import WorkflowOrchestrator
+
+    llm = get_llm_service()
+    pb = get_pitchbook_adapter()
+    storage = get_storage()
+    miner = MinerEngine(llm_service=llm, pitchbook_adapter=pb, storage=storage)
+    orchestrator = WorkflowOrchestrator(
+        run_repo=repo,
+        checkpoint_repo=CheckpointRepository(session),
+        company_repo=CompanyRepository(session),
+        review_repo=ReviewRepository(session),
+        storage=storage,
+    )
+    result = await orchestrator.resume_pipeline(UUID(run_id), miner_engine=miner)
+    return {"status": "completed", "run_id": run_id, "result": result}
 
 
 @router.get("/{run_id}/checkpoints")

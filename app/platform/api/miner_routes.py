@@ -94,12 +94,32 @@ async def resolve_review_item(
 
 @router.post("/{run_id}/stages/{stage}/rerun")
 async def rerun_stage(run_id: str, stage: str, session: AsyncSession = Depends(get_db)):
-    """Re-run a single pipeline stage."""
+    """Re-run a single pipeline stage (inline)."""
+    from uuid import UUID
+
+    from app.ai.llm_service import get_llm_service
+    from app.miner.engine import MinerEngine
+    from app.miner.pitchbook.mcp_client import get_pitchbook_adapter
     from app.platform.models.enums import WorkflowStage
+    from app.platform.persistence.repositories import RunRepository
+    from app.platform.persistence.storage import get_storage
+    from app.platform.workflow.orchestrator import WorkflowOrchestrator
+
     try:
         ws = WorkflowStage(stage)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Unknown stage: {stage}")
 
-    # TODO: Enqueue stage re-run as background job
-    return {"status": "accepted", "run_id": run_id, "stage": stage, "note": "Stage re-run enqueued"}
+    run_repo = RunRepository(session)
+    run = await run_repo.get(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    llm = get_llm_service()
+    pb = get_pitchbook_adapter()
+    storage = get_storage()
+    miner = MinerEngine(llm_service=llm, pitchbook_adapter=pb, storage=storage)
+    orchestrator = WorkflowOrchestrator(run_repo=run_repo, storage=storage)
+
+    result = await orchestrator.rerun_stage(UUID(run_id), ws, miner_engine=miner)
+    return {"status": "completed", "run_id": run_id, "stage": stage, "result": result}
