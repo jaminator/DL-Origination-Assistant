@@ -1,0 +1,40 @@
+{
+  "sources": [
+    {
+      "source_name": "Data Center Frontier",
+      "source_type": "trade_journal",
+      "url": "https://www.datacenterfrontier.com",
+      "mapped_subverticals": ["Electrical Contractors (Data Center / Mission-Critical)"],
+      "rationale": "Leading publication covering data center construction and infrastructure",
+      "expected_company_type": "Contractors and service providers in data center space",
+      "expected_data_quality": "medium",
+      "access_type": "public_scrape",
+      "recommendation_priority": "core"
+    },
+    {
+      "source_name": "ENR Top Specialty Contractors",
+      "source_type": "ranking_list",
+      "url": "https://www.enr.com/toplists/2024-Top-Specialty-Contractors-702",
+      "mapped_subverticals": ["Electrical Contractors (Data Center / Mission-Critical)", "Mechanical / HVAC Contractors (Data Center Cooling)"],
+      "rationale": "Industry-standard ranking of contractors by revenue",
+      "expected_company_type": "Large and mid-size specialty contractors",
+      "expected_data_quality": "high",
+      "access_type": "public_manual",
+      "recommendation_priority": "core"
+    }
+  ],
+  "naics_codes": [
+    {
+      "code": "238210",
+      "description": "Electrical Contractors and Other Wiring Installation Contractors",
+      "mapped_subverticals": ["Electrical Contractors (Data Center / Mission-Critical)"],
+      "relevance_explanation": "Primary NAICS for electrical construction and wiring contractors"
+    },
+    {
+      "code": "238220",
+      "description": "Plumbing, Heating, and Air-Conditioning Contractors",
+      "mapped_subverticals": ["Mechanical / HVAC Contractors (Data Center Cooling)"],
+      "relevance_explanation": "Primary NAICS for HVAC/mechanical contractors"
+    }
+  ]
+}

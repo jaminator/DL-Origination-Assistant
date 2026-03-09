@@ -1,0 +1,37 @@
+"""Application settings loaded from environment variables."""
+
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    # Database
+    database_url: str = "postgresql+asyncpg://dl_user:dl_pass@db:5432/dl_origination"
+
+    # Redis
+    redis_url: str = "redis://redis:6379/0"
+
+    # Auth
+    auth_enabled: bool = False
+
+    # AI / LLM
+    llm_provider: str = "mock"  # "claude" or "mock"
+    llm_model: str = "claude-sonnet-4-5-20250514"
+    llm_api_key: str = ""
+    llm_rate_limit_rpm: int = 50
+
+    # PitchBook MCP
+    pitchbook_provider: str = "mock"  # "mcp" or "mock"
+    mcp_pitchbook_url: str = ""
+    mcp_pitchbook_token: str = ""
+
+    # AI confidence
+    ai_confidence_auto_accept_threshold: float = 0.85
+
+    # Storage
+    storage_backend: str = "local"  # "local" or "s3"
+    storage_path: str = "./data"
+
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+
+settings = Settings()

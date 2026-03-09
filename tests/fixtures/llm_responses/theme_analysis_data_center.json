@@ -1,0 +1,48 @@
+{
+  "subverticals": [
+    {
+      "subvertical_name": "Electrical Contractors (Data Center / Mission-Critical)",
+      "description": "Electrical contractors specializing in data center power infrastructure, including medium-voltage distribution, busway, PDUs, and generator paralleling.",
+      "thematic_fit_explanation": "Directly benefits from data center capex boom. Every new facility requires extensive electrical infrastructure.",
+      "lender_fit_explanation": "Fragmented market with recurring maintenance revenue, high margins, and low capex intensity. Strong DDTL use case for branch expansion and M&A roll-up.",
+      "thematic_fit_score": 92,
+      "lender_fit_score": 88,
+      "recommendation_status": "strong_fit",
+      "demand_profile": "Strong secular demand driven by AI/cloud buildout. Multi-year backlog common.",
+      "cyclicality_profile": "Modestly cyclical. Data center demand somewhat insulated from general construction cycles.",
+      "fragmentation_profile": "Highly fragmented. Thousands of local/regional players. A few national firms exist as strategic acquirers.",
+      "recurring_revenue_profile": "30-50% recurring via maintenance contracts, testing, and commissioning.",
+      "margin_profile": "Gross margins 35-45%, EBITDA margins 12-18% for well-run operators.",
+      "capital_intensity_profile": "Low. Primarily labor-based. Limited fixed asset requirements.",
+      "concentration_risk_profile": "Moderate customer concentration risk (large GCs/owners). Low supplier concentration.",
+      "ownership_landscape": "Mix of founder-owned, family-owned, and PE-backed. Many acquisition targets remain founder-held.",
+      "ddtl_use_case_fit": "Excellent. M&A roll-up, geographic expansion, capacity expansion for large project backlogs.",
+      "example_borrower_archetypes": ["Regional electrical contractor with $50-200M revenue", "Specialty data center electrical subcontractor"],
+      "reasons_to_lend": ["Strong secular demand", "Recurring maintenance revenue", "Fragmented market supports roll-up", "Low capex intensity"],
+      "reasons_not_to_lend": ["Customer concentration", "Labor availability risk", "Bonding capacity constraints"],
+      "confidence": 0.9
+    },
+    {
+      "subvertical_name": "Mechanical / HVAC Contractors (Data Center Cooling)",
+      "description": "Mechanical contractors specializing in precision cooling systems for data centers and mission-critical facilities.",
+      "thematic_fit_explanation": "Cooling is the second-largest cost center in data center construction. AI workloads drive increasing cooling requirements.",
+      "lender_fit_explanation": "Similar lending profile to electrical: fragmented, recurring maintenance, good margins. Slightly more capital-intensive due to equipment.",
+      "thematic_fit_score": 88,
+      "lender_fit_score": 82,
+      "recommendation_status": "strong_fit",
+      "demand_profile": "Strong. Liquid cooling adoption creates additional demand on top of traditional HVAC.",
+      "cyclicality_profile": "Modestly cyclical. Mission-critical retrofit work provides baseline demand.",
+      "fragmentation_profile": "Fragmented. National players like Comfort Systems serve as strategic buyer backstop.",
+      "recurring_revenue_profile": "40-60% recurring via maintenance, monitoring, and service contracts.",
+      "margin_profile": "Gross margins 30-40%, EBITDA margins 10-15%.",
+      "capital_intensity_profile": "Moderate. Some equipment and fleet investment required.",
+      "concentration_risk_profile": "Moderate. Similar dynamics to electrical contractors.",
+      "ownership_landscape": "Mix of founder-owned and PE-backed. Active consolidation in HVAC services.",
+      "ddtl_use_case_fit": "Strong. M&A roll-up, de novo branch, equipment for contracted growth.",
+      "example_borrower_archetypes": ["Regional HVAC contractor with data center specialization", "Precision cooling services provider"],
+      "reasons_to_lend": ["High recurring revenue", "Secular cooling demand growth", "Fragmented market"],
+      "reasons_not_to_lend": ["Higher capex than electrical", "Technology transition risk (liquid cooling)"],
+      "confidence": 0.85
+    }
+  ]
+}

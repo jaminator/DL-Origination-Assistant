@@ -1,0 +1,73 @@
+# Data Center Ecosystem Profile
+# Pre-populated hints for the "data center capex secular growth" theme
+
+profile_name: data_center
+description: Data center and critical infrastructure ecosystem
+
+subvertical_hints:
+  - name: Electrical Contractors (Data Center / Mission-Critical)
+    description: Electrical contractors specializing in data center power infrastructure
+  - name: Mechanical / HVAC Contractors (Data Center Cooling)
+    description: Mechanical contractors specializing in precision cooling for data centers
+  - name: Fire Protection & Life Safety (Data Center)
+    description: Fire suppression and life safety systems for mission-critical facilities
+  - name: Power Distribution & Switchgear
+    description: Manufacturers and integrators of power distribution equipment
+  - name: Generator & UPS Services
+    description: Generator rental, maintenance, and UPS service providers
+  - name: Structured Cabling & Connectivity
+    description: Low-voltage cabling and fiber optic installation contractors
+  - name: Commissioning & Testing Services
+    description: Building commissioning, testing, and certification for data centers
+  - name: Modular / Prefabricated Data Center Solutions
+    description: Modular and prefabricated data center infrastructure providers
+  - name: Environmental Monitoring & BMS
+    description: Building management systems and environmental monitoring
+  - name: Data Center Facility Management
+    description: Third-party facility management and operations services
+
+source_templates:
+  - source_name: "Data Center Frontier"
+    source_type: trade_journal
+    url: "https://www.datacenterfrontier.com"
+    recommendation_priority: core
+  - source_name: "Mission Critical Magazine"
+    source_type: trade_journal
+    url: "https://www.missioncriticalmagazine.com"
+    recommendation_priority: core
+  - source_name: "ENR Top Specialty Contractors"
+    source_type: ranking_list
+    url: "https://www.enr.com"
+    recommendation_priority: core
+  - source_name: "NETA Member Directory"
+    source_type: association_directory
+    url: "https://www.netaworld.org"
+    recommendation_priority: useful
+  - source_name: "BICSI Member Directory"
+    source_type: certification_directory
+    url: "https://www.bicsi.org"
+    recommendation_priority: useful
+
+naics_codes:
+  - code: "238210"
+    description: "Electrical Contractors"
+  - code: "238220"
+    description: "Plumbing, Heating, and Air-Conditioning Contractors"
+  - code: "238290"
+    description: "Other Building Equipment Contractors"
+  - code: "334419"
+    description: "Other Electronic Component Manufacturing"
+  - code: "541330"
+    description: "Engineering Services"
+  - code: "541380"
+    description: "Testing Laboratories and Services"
+  - code: "561210"
+    description: "Facilities Support Services"
+
+scoring_weights:
+  revenue_scale: 20.0
+  ebitda_margin: 15.0
+  recurring_revenue: 15.0
+  industry_exposure: 20.0
+  ownership_tier: 15.0
+  data_completeness: 15.0

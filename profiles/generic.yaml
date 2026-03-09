@@ -1,0 +1,28 @@
+# Generic profile — no industry-specific knowledge
+# Use this as a starting point for any new theme
+
+profile_name: generic
+description: Generic profile for theme-driven discovery without industry-specific hints
+
+# No pre-populated sub-verticals or sources
+subvertical_hints: []
+source_templates: []
+
+# Default scoring weights (can override per-run)
+scoring_weights:
+  revenue_scale: 20.0
+  ebitda_margin: 15.0
+  recurring_revenue: 15.0
+  industry_exposure: 20.0
+  ownership_tier: 15.0
+  data_completeness: 15.0
+
+# Default thresholds
+revenue_ceiling: 1000.0
+cascade_anchor_threshold: 1000.0
+ebitda_soft_ceiling: 150.0
+
+# Ownership bonuses
+tier_a_bonus: 15.0
+tier_b_bonus: 8.0
+tier_c_bonus: 0.0
