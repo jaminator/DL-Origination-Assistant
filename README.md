@@ -2,7 +2,7 @@
 
 A production-grade platform for automating direct-lending origination target mining. Accepts investment themes, recommends lender-friendly sub-verticals, discovers and enriches borrower candidates, and exports scored outreach lists.
 
-**152 tests passing** | Python 3.11+ | FastAPI + SQLAlchemy 2.0 async | Mock-first local dev
+**200 tests passing** | Python 3.11+ | FastAPI + SQLAlchemy 2.0 async | Mock-first local dev
 
 ## Documentation
 
@@ -199,16 +199,74 @@ Same Docker images. Change:
 
 ## Development
 
+### Setup
+
 ```bash
 # Install dev dependencies
 pip install -e ".[dev]"
 
-# Run tests
+# Copy environment template
+cp .env.example .env
+```
+
+### Running Tests
+
+```bash
+# All tests (no external services needed)
 pytest tests/ -v
 
-# Lint
-ruff check app/ tests/
+# By category
+pytest tests/test_smoke/              # Import, config, schema smoke tests
+pytest tests/test_integration/        # DB, LLM service, API flow integration
+pytest tests/test_pipeline/           # Full miner pipeline
+pytest tests/test_workflow/           # Dedup, dispositioning, review queue
 
-# Run API locally (without Docker)
+# With coverage
+pytest tests/ --cov=app --cov-report=term-missing
+```
+
+### Running Locally (Without Docker)
+
+```bash
+# Option A: SQLite (no PostgreSQL needed)
+export DATABASE_URL=sqlite+aiosqlite:///./data/dev.db
+uvicorn app.main:app --reload
+
+# Option B: Local PostgreSQL
+docker compose up db redis    # Start just DB + Redis
+export DATABASE_URL=postgresql+asyncpg://dl_user:dl_pass@localhost:5432/dl_origination
 uvicorn app.main:app --reload
 ```
+
+### Database Migrations
+
+```bash
+# Apply migrations (requires PostgreSQL)
+DATABASE_URL=postgresql+asyncpg://dl_user:dl_pass@localhost:5432/dl_origination \
+  alembic upgrade head
+
+# Generate a new migration after ORM changes
+DATABASE_URL=postgresql+asyncpg://dl_user:dl_pass@localhost:5432/dl_origination \
+  alembic revision --autogenerate -m "description"
+```
+
+### Lint
+
+```bash
+ruff check app/ tests/
+```
+
+### Using Real Claude API
+
+```bash
+# In .env:
+LLM_PROVIDER=claude
+LLM_API_KEY=sk-ant-your-key-here
+# LLM_MODEL defaults to claude-sonnet-4-5-20250514
+```
+
+The ClaudeLLMService includes:
+- Retry with exponential backoff (3 attempts for timeouts, server errors, rate limits)
+- Clear error messages for auth failures, rate limits, malformed responses
+- Persistent httpx client with connection pooling
+- Structured logging (no secrets leaked)

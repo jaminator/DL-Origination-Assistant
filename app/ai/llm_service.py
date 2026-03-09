@@ -1,5 +1,6 @@
 """LLM service abstraction — provider-agnostic interface for AI operations."""
 
+import asyncio
 import json
 import time
 from abc import ABC, abstractmethod
@@ -12,6 +13,30 @@ from app.platform.config.settings import settings
 from app.platform.utils.logging import get_logger
 
 logger = get_logger("ai.llm")
+
+
+class LLMError(Exception):
+    """Base exception for LLM service errors."""
+
+
+class LLMAuthError(LLMError):
+    """API key is missing, invalid, or rejected."""
+
+
+class LLMRateLimitError(LLMError):
+    """Rate limit exceeded — caller should back off."""
+
+    def __init__(self, message: str, retry_after: float | None = None):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+class LLMTimeoutError(LLMError):
+    """Request timed out."""
+
+
+class LLMResponseError(LLMError):
+    """Response was not valid or could not be parsed."""
 
 
 class LLMResponse(BaseModel):
@@ -47,12 +72,34 @@ class LLMService(ABC):
 
 
 class ClaudeLLMService(LLMService):
-    """Claude API via direct httpx calls."""
+    """Claude API via httpx with retry, timeout, and error handling."""
+
+    MAX_RETRIES = 3
+    INITIAL_BACKOFF = 1.0  # seconds
+    REQUEST_TIMEOUT = 120.0  # seconds
 
     def __init__(self):
+        if not settings.llm_api_key:
+            raise LLMAuthError(
+                "LLM_API_KEY is required when LLM_PROVIDER=claude. "
+                "Set the LLM_API_KEY environment variable to your Anthropic API key."
+            )
         self.api_key = settings.llm_api_key
         self.model = settings.llm_model
         self.base_url = "https://api.anthropic.com/v1"
+        self._client: httpx.AsyncClient | None = None
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                timeout=httpx.Timeout(self.REQUEST_TIMEOUT, connect=10.0),
+                headers={
+                    "x-api-key": self.api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+            )
+        return self._client
 
     async def complete(
         self,
@@ -61,7 +108,6 @@ class ClaudeLLMService(LLMService):
         response_schema: dict | None = None,
         temperature: float = 0.7,
     ) -> LLMResponse:
-        start = time.monotonic()
         messages = [{"role": "user", "content": prompt}]
         body: dict[str, Any] = {
             "model": self.model,
@@ -72,31 +118,87 @@ class ClaudeLLMService(LLMService):
         if system:
             body["system"] = system
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            resp = await client.post(
-                f"{self.base_url}/messages",
-                json=body,
-                headers={
-                    "x-api-key": self.api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
+        last_error: Exception | None = None
+        for attempt in range(self.MAX_RETRIES + 1):
+            if attempt > 0:
+                backoff = self.INITIAL_BACKOFF * (2 ** (attempt - 1))
+                logger.info("llm_retry", attempt=attempt, backoff_s=backoff)
+                await asyncio.sleep(backoff)
+
+            start = time.monotonic()
+            try:
+                client = await self._get_client()
+                resp = await client.post(f"{self.base_url}/messages", json=body)
+            except httpx.TimeoutException as exc:
+                last_error = LLMTimeoutError(f"Request timed out after {self.REQUEST_TIMEOUT}s: {exc}")
+                logger.warning("llm_timeout", attempt=attempt)
+                continue
+            except httpx.ConnectError as exc:
+                last_error = LLMError(f"Connection failed: {exc}")
+                logger.warning("llm_connection_error", attempt=attempt, error=str(exc))
+                continue
+
+            latency = (time.monotonic() - start) * 1000
+
+            if resp.status_code == 401:
+                raise LLMAuthError(
+                    "Anthropic API rejected the API key. "
+                    "Verify that LLM_API_KEY is a valid Anthropic API key."
+                )
+            if resp.status_code == 429:
+                retry_after = resp.headers.get("retry-after")
+                retry_seconds = float(retry_after) if retry_after else None
+                last_error = LLMRateLimitError(
+                    f"Rate limit exceeded (attempt {attempt + 1})",
+                    retry_after=retry_seconds,
+                )
+                logger.warning("llm_rate_limited", attempt=attempt, retry_after=retry_seconds)
+                if retry_seconds and attempt < self.MAX_RETRIES:
+                    await asyncio.sleep(retry_seconds)
+                continue
+            if resp.status_code == 400:
+                raise LLMResponseError(f"Bad request: {resp.text}")
+            if resp.status_code in (500, 503):
+                last_error = LLMError(f"Anthropic server error {resp.status_code}: {resp.text}")
+                logger.warning("llm_server_error", status=resp.status_code, attempt=attempt)
+                continue
+            if resp.status_code != 200:
+                raise LLMError(f"Unexpected status {resp.status_code}: {resp.text}")
+
+            try:
+                data = resp.json()
+            except (json.JSONDecodeError, ValueError) as exc:
+                raise LLMResponseError(f"Response is not valid JSON: {exc}") from exc
+
+            if "content" not in data or not data["content"]:
+                raise LLMResponseError(f"Response missing 'content' field: {data}")
+
+            try:
+                content = data["content"][0]["text"]
+            except (KeyError, IndexError, TypeError) as exc:
+                raise LLMResponseError(
+                    f"Unexpected response structure: {exc}. Response: {data}"
+                ) from exc
+
+            usage = data.get("usage", {})
+            logger.info(
+                "llm_complete",
+                model=self.model,
+                prompt_tokens=usage.get("input_tokens", 0),
+                completion_tokens=usage.get("output_tokens", 0),
+                latency_ms=round(latency, 1),
             )
-            resp.raise_for_status()
-            data = resp.json()
 
-        content = data["content"][0]["text"]
-        latency = (time.monotonic() - start) * 1000
-        usage = data.get("usage", {})
+            return LLMResponse(
+                content=content,
+                model=self.model,
+                provider="claude",
+                prompt_tokens=usage.get("input_tokens", 0),
+                completion_tokens=usage.get("output_tokens", 0),
+                latency_ms=latency,
+            )
 
-        return LLMResponse(
-            content=content,
-            model=self.model,
-            provider="claude",
-            prompt_tokens=usage.get("input_tokens", 0),
-            completion_tokens=usage.get("output_tokens", 0),
-            latency_ms=latency,
-        )
+        raise last_error or LLMError("All retry attempts exhausted")
 
     async def complete_json(
         self,
@@ -105,11 +207,20 @@ class ClaudeLLMService(LLMService):
         temperature: float = 0.3,
     ) -> dict:
         resp = await self.complete(prompt, system=system, temperature=temperature)
-        # Extract JSON from response (may be wrapped in markdown code blocks)
         text = resp.content.strip()
         if text.startswith("```"):
             text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-        return json.loads(text)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise LLMResponseError(
+                f"LLM response is not valid JSON: {exc}. Raw content: {text[:500]}"
+            ) from exc
+
+    async def close(self) -> None:
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()
+            self._client = None
 
 
 class MockLLMService(LLMService):
@@ -187,7 +298,5 @@ class MockLLMService(LLMService):
 def get_llm_service() -> LLMService:
     """Factory for LLM service based on settings."""
     if settings.llm_provider == "claude":
-        if not settings.llm_api_key:
-            raise ValueError("LLM_API_KEY required when LLM_PROVIDER=claude")
-        return ClaudeLLMService()
+        return ClaudeLLMService()  # raises LLMAuthError if key missing
     return MockLLMService()

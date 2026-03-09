@@ -255,6 +255,8 @@ Priority (highest → lowest):
 
 ```
 tests/
+├── test_integration/        # DB persistence, LLM service, API happy-path (SQLite)
+├── test_smoke/              # Import, config, schema, export smoke tests
 ├── test_pipeline/           # Full pipeline + orchestrator integration
 ├── test_recommendation/     # Recommender engine unit tests
 ├── test_enrichment/         # Size estimator, exposure classifier, web enricher
@@ -267,7 +269,7 @@ tests/
 └── conftest.py              # Shared fixtures
 ```
 
-All 152 tests run with `pytest tests/ -v` — no external services required.
+All 200 tests run with `pytest tests/ -v` — no external services required.
 
 ## Implementation Status
 

@@ -77,7 +77,23 @@ pytest tests/ --cov=app --cov-report=term-missing
 pytest tests/test_pipeline/ -v
 ```
 
-All 152 tests run with mock providers — no external services required.
+All 200 tests run with mock providers — no external services required.
+
+### Test Categories
+
+| Category | Directory | What It Tests |
+|---|---|---|
+| Smoke | `tests/test_smoke/` | Imports, config, schemas, exports, scoring |
+| Integration | `tests/test_integration/` | Real SQL (SQLite), ClaudeLLMService, API workflow |
+| Pipeline | `tests/test_pipeline/` | Full miner pipeline with mocks |
+| Recommendation | `tests/test_recommendation/` | Recommender engine |
+| Enrichment | `tests/test_enrichment/` | Size estimator, exposure classifier |
+| Sources | `tests/test_sources/` | NAICS, mock, web scraper adapters |
+| Scoring | `tests/test_scoring/` | Company scorer formula |
+| Validation | `tests/test_validation/` | QA gate checks |
+| Workflow | `tests/test_workflow/` | Dedup, dispositioning, review queue |
+| API | `tests/test_api/` | FastAPI endpoint tests |
+| Utils | `tests/test_utils/` | Name normalization |
 
 ### CLI Usage
 
@@ -211,14 +227,16 @@ pitchbook_enrichment_failed company=... error=...
 
 ### Database Migrations
 
-The project includes Alembic for schema migrations:
+The project includes Alembic for schema migrations. The `DATABASE_URL` env var overrides the default URL in `alembic.ini`:
 
 ```bash
-# Generate migration from model changes
-alembic revision --autogenerate -m "description"
+# Apply the initial migration (creates all tables)
+DATABASE_URL=postgresql+asyncpg://dl_user:dl_pass@localhost:5432/dl_origination \
+  alembic upgrade head
 
-# Apply migrations
-alembic upgrade head
+# Generate a new migration after ORM model changes
+DATABASE_URL=postgresql+asyncpg://dl_user:dl_pass@localhost:5432/dl_origination \
+  alembic revision --autogenerate -m "description"
 
 # Check current version
 alembic current
