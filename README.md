@@ -2,6 +2,14 @@
 
 A production-grade platform for automating direct-lending origination target mining. Accepts investment themes, recommends lender-friendly sub-verticals, discovers and enriches borrower candidates, and exports scored outreach lists.
 
+**113 tests passing** | Python 3.11+ | FastAPI + SQLAlchemy 2.0 async | Mock-first local dev
+
+## Documentation
+
+- [Architecture Guide](docs/architecture.md) — Module layout, data flow, pipeline stages, design decisions
+- [Scoring and Dispositioning](docs/scoring-and-dispositioning.md) — Scoring formula, disposition rules, QA gates, dedup thresholds
+- [Operations Guide](docs/operations.md) — Setup, deployment, configuration, extending the platform
+
 ## Architecture
 
 ```
