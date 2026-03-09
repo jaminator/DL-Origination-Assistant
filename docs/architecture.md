@@ -281,6 +281,7 @@ All 200 tests run with `pytest tests/ -v` — no external services required.
 | Pydantic domain models | **Complete** | CompanyRecord, RunConfig, ReviewQueueItem, AIProvenance, all enums |
 | Recommender Engine | **Complete** | Theme → sub-verticals → sources via LLM prompts |
 | Miner Engine (10 stages) | **Complete** | Full pipeline with checkpoint/resume support |
+| ClaudeLLMService | **Complete** | Retry/backoff, auth validation, rate limit, error handling, validated live |
 | MockLLMService | **Complete** | Fixture-based responses, keyword detection, deterministic |
 | MockPitchBookClient | **Complete** | Synthetic ownership, debt, competitor data |
 | MockSourceAdapter | **Complete** | Source-type-aware synthetic company generation |
@@ -299,20 +300,19 @@ All 200 tests run with `pytest tests/ -v` — no external services required.
 | Structured logging (structlog) | **Complete** | JSON output, stage-level events |
 | AI provenance framework | **Complete** | AIProvenance model with confidence + acceptance tracking |
 | Prompt template system | **Complete** | Versioned prompts with structured output parsing |
+| ORM models (GUID portable) | **Complete** | Works on PostgreSQL (native UUID) and SQLite (String) |
+| Repository layer | **Complete** | Full CRUD; tested against real SQL (SQLite) |
+| Alembic migration | **Complete** | Initial schema with 8 tables; env var override support |
 
-### Stub / Skeleton (requires real credentials to activate)
+### Stub / Skeleton (requires real credentials or connectors)
 
 | Component | Status | What's Missing |
 |---|---|---|
-| ClaudeLLMService | **Stub** | HTTP call structure exists; untested without API key |
 | MCPPitchBookClient | **Stub** | Interface defined; MCP tool calls are placeholder `pass` |
 | WebScraperAdapter | **Partial** | httpx + BeautifulSoup extraction works; no real URLs configured |
 | DirectoryAdapter | **Partial** | Scraping logic exists; no real directory URLs |
 | ResearchOrchestrator | **Stub** | Batch/retry framework exists; no integration with real connectors |
 | ARQ worker | **Stub** | Worker config exists; requires Redis to activate |
-| Alembic migrations | **Scaffold** | `env.py` configured; no migration versions generated |
-| ORM models | **Complete** | SQLAlchemy tables defined; untested against real PostgreSQL |
-| Repository layer | **Complete** | Full CRUD; untested against real PostgreSQL |
 | Auth boundary | **Stub** | `get_current_user` returns dummy; `AUTH_ENABLED` flag exists |
 
 ### Not Implemented (documented in plan, not started)
