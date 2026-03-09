@@ -29,6 +29,10 @@ def assign_disposition(
     if company.hq_country and company.hq_country not in geo:
         return Disposition.EXCLUDE
 
+    # Public mega-cap check (before cascade anchor — these are never lending targets)
+    if company.is_public is True and company.revenue_estimate and company.revenue_estimate > 5000:
+        return Disposition.EXCLUDE
+
     # Revenue-based disposition (deterministic)
     if company.revenue_estimate is not None:
         if company.revenue_estimate > cascade_anchor_threshold:
@@ -40,9 +44,5 @@ def assign_disposition(
         # Boundary: very small or very large relative to target
         if company.revenue_estimate < 5.0:  # Under $5M — likely too small
             return Disposition.EXCLUDE
-
-    # Public mega-cap check
-    if company.is_public is True and company.revenue_estimate and company.revenue_estimate > 5000:
-        return Disposition.EXCLUDE
 
     return Disposition.PRIMARY

@@ -8,7 +8,8 @@ class PromptTemplate:
     version: str = "1.0"
 
     def __init__(self, template_id: str = "", version: str = "1.0"):
-        self.template_id = template_id or self.__class__.__name__
+        # Prefer explicit argument, then class-level attribute, then class name
+        self.template_id = template_id or getattr(self.__class__, "template_id", "") or self.__class__.__name__
         self.version = version
 
     def render(self, **kwargs: str) -> str:
