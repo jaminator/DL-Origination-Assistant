@@ -28,7 +28,9 @@ class TestImports:
 
     def test_import_llm_service(self):
         from app.ai.llm_service import MockLLMService, get_llm_service
-        svc = get_llm_service()
+        with patch("app.ai.llm_service.settings") as mock_settings:
+            mock_settings.llm_provider = "mock"
+            svc = get_llm_service()
         assert isinstance(svc, MockLLMService)
 
     def test_import_mcp_manager(self):
@@ -223,10 +225,12 @@ class TestMinerSmoke:
             llm = MockLLMService()
             pb = MockPitchBookClient()
             storage = LocalStorage(tmpdir)
+            from app.miner.sources.registry import SourceRegistry
             miner = MinerEngine(
                 llm_service=llm,
                 pitchbook_adapter=pb,
                 storage=storage,
+                source_registry=SourceRegistry(use_mock=True),
             )
 
             run_id = uuid4()
