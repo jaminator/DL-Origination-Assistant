@@ -24,7 +24,7 @@ def mock_settings():
     """Patch settings to provide a fake API key."""
     with patch("app.ai.llm_service.settings") as s:
         s.llm_api_key = "sk-test-fake-key"
-        s.llm_model = "claude-sonnet-4-5-20250514"
+        s.llm_model = "claude-sonnet-4-5-20250929"
         yield s
 
 
@@ -37,7 +37,7 @@ def _make_success_response(content: str = "Hello world") -> httpx.Response:
             "type": "message",
             "role": "assistant",
             "content": [{"type": "text", "text": content}],
-            "model": "claude-sonnet-4-5-20250514",
+            "model": "claude-sonnet-4-5-20250929",
             "usage": {"input_tokens": 10, "output_tokens": 5},
         },
     )
@@ -49,7 +49,7 @@ class TestClaudeLLMServiceInit:
     def test_missing_api_key_raises(self):
         with patch("app.ai.llm_service.settings") as s:
             s.llm_api_key = ""
-            s.llm_model = "claude-sonnet-4-5-20250514"
+            s.llm_model = "claude-sonnet-4-5-20250929"
             with pytest.raises(LLMAuthError, match="LLM_API_KEY is required"):
                 ClaudeLLMService()
 

@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     # AI / LLM
     llm_provider: str = "mock"  # "claude" or "mock"
-    llm_model: str = "claude-sonnet-4-5-20250514"
+    llm_model: str = "claude-sonnet-4-5-20250929"
     llm_api_key: str = ""
     llm_rate_limit_rpm: int = 50
 
