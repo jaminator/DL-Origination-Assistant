@@ -262,7 +262,7 @@ ruff check app/ tests/
 # In .env:
 LLM_PROVIDER=claude
 LLM_API_KEY=sk-ant-your-key-here
-# LLM_MODEL defaults to claude-sonnet-4-5-20250929
+# LLM_MODEL defaults to claude-sonnet-4-6
 ```
 
 The ClaudeLLMService includes:

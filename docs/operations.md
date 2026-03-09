@@ -143,7 +143,7 @@ All settings are loaded from `.env` via Pydantic Settings.
 | Variable | Default | Description |
 |---|---|---|
 | `LLM_PROVIDER` | `mock` | `mock` for local dev, `claude` for production |
-| `LLM_MODEL` | `claude-sonnet-4-5-20250929` | Claude model ID |
+| `LLM_MODEL` | `claude-sonnet-4-6` | Claude model ID |
 | `LLM_API_KEY` | (empty) | Anthropic API key |
 | `LLM_RATE_LIMIT_RPM` | `50` | Requests per minute limit |
 | `AI_CONFIDENCE_AUTO_ACCEPT_THRESHOLD` | `0.85` | Auto-accept AI outputs above this confidence |
