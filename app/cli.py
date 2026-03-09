@@ -175,9 +175,61 @@ def recommend_subverticals(run_id: str = typer.Option(..., help="Run ID")):
 
 @recommend_app.command("sources")
 def recommend_sources(run_id: str = typer.Option(..., help="Run ID")):
-    """Generate source recommendations."""
-    console.print(f"[yellow]Generating source recommendations for run {run_id}...[/yellow]")
-    # TODO: Wire up similar to subverticals
+    """Generate source recommendations for confirmed sub-verticals."""
+    async def _recommend():
+        from uuid import UUID
+        from app.ai.llm_service import get_llm_service
+        from app.platform.persistence.database import async_session
+        from app.platform.persistence.repositories import RecommendationRepository, RunRepository
+        from app.recommender.engine import RecommenderEngine
+
+        async with async_session() as session:
+            run_repo = RunRepository(session)
+            run = await run_repo.get(run_id)
+            if not run:
+                console.print("[red]Run not found[/red]")
+                return
+
+            # Get confirmed sub-verticals from run config
+            selected = run.config.get("selected_subverticals", [])
+            if not selected:
+                # Fall back: use all theme recommendations
+                rec_repo = RecommendationRepository(session)
+                recs = await rec_repo.list_theme_recommendations(run_id)
+                selected = [r.subvertical_name for r in recs]
+
+            if not selected:
+                console.print("[red]No sub-verticals selected. Run 'recommend subverticals' and 'confirm subverticals' first.[/red]")
+                return
+
+            llm = get_llm_service()
+            engine = RecommenderEngine(llm)
+            revenue_ceiling = run.config.get("revenue_ceiling", 1000.0)
+            sources = await engine.recommend_sources(UUID(run_id), selected, revenue_ceiling)
+
+            rec_repo = RecommendationRepository(session)
+            src_dicts = [s.model_dump(mode="json") for s in sources]
+            for d in src_dicts:
+                d["run_id"] = run_id
+            await rec_repo.save_source_recommendations(src_dicts)
+
+            table = Table(title="Source Recommendations")
+            table.add_column("#", style="dim")
+            table.add_column("Source")
+            table.add_column("Type")
+            table.add_column("Sub-verticals")
+            table.add_column("Priority")
+            for i, s in enumerate(sources, 1):
+                table.add_row(
+                    str(i),
+                    s.source_name,
+                    s.source_type,
+                    ", ".join(s.mapped_subverticals[:2]),
+                    s.recommendation_priority.value,
+                )
+            console.print(table)
+
+    _run_async(_recommend())
 
 
 # ---- Confirm commands ----
@@ -189,8 +241,45 @@ def confirm_subverticals(
     select: Optional[str] = typer.Option(None, help="Comma-separated indices to select (e.g., 1,3,5)"),
 ):
     """Confirm sub-vertical selections."""
-    console.print(f"[green]Sub-verticals confirmed for run {run_id}[/green]")
-    # TODO: Wire up to repository
+    async def _confirm():
+        from app.platform.persistence.database import async_session
+        from app.platform.persistence.repositories import RecommendationRepository, RunRepository
+
+        async with async_session() as session:
+            rec_repo = RecommendationRepository(session)
+            recs = await rec_repo.list_theme_recommendations(run_id)
+            if not recs:
+                console.print("[red]No recommendations found. Run 'recommend subverticals' first.[/red]")
+                return
+
+            if accept_all:
+                selected_names = [r.subvertical_name for r in recs]
+                for r in recs:
+                    await rec_repo.update_selection(r.id, True)
+            elif select:
+                indices = [int(i.strip()) - 1 for i in select.split(",")]
+                selected_names = []
+                for i, r in enumerate(recs):
+                    is_selected = i in indices
+                    await rec_repo.update_selection(r.id, is_selected)
+                    if is_selected:
+                        selected_names.append(r.subvertical_name)
+            else:
+                console.print("[yellow]Specify --accept-all or --select indices[/yellow]")
+                return
+
+            # Save selections to run config
+            run_repo = RunRepository(session)
+            run = await run_repo.get(run_id)
+            if run:
+                run.config["selected_subverticals"] = selected_names
+                await session.commit()
+
+            console.print(f"[green]Confirmed {len(selected_names)} sub-verticals for run {run_id}[/green]")
+            for name in selected_names:
+                console.print(f"  - {name}")
+
+    _run_async(_confirm())
 
 
 @confirm_app.command("sources")
@@ -199,7 +288,36 @@ def confirm_sources(
     accept_all: bool = typer.Option(False, help="Accept all recommended sources"),
 ):
     """Confirm source selections."""
-    console.print(f"[green]Sources confirmed for run {run_id}[/green]")
+    async def _confirm():
+        from app.platform.persistence.database import async_session
+        from app.platform.persistence.repositories import RecommendationRepository, RunRepository
+
+        async with async_session() as session:
+            rec_repo = RecommendationRepository(session)
+            sources = await rec_repo.list_source_recommendations(run_id)
+            if not sources:
+                console.print("[red]No source recommendations found. Run 'recommend sources' first.[/red]")
+                return
+
+            selected_sources = []
+            for s in sources:
+                src_data = s.data if isinstance(s.data, dict) else {}
+                selected_sources.append({
+                    "source_name": s.source_name,
+                    "source_type": s.source_type,
+                    "url": src_data.get("url"),
+                    "subvertical": ", ".join(src_data.get("mapped_subverticals", [])),
+                })
+
+            run_repo = RunRepository(session)
+            run = await run_repo.get(run_id)
+            if run:
+                run.config["selected_sources"] = selected_sources
+                await session.commit()
+
+            console.print(f"[green]Confirmed {len(selected_sources)} sources for run {run_id}[/green]")
+
+    _run_async(_confirm())
 
 
 # ---- Mine commands ----
@@ -207,14 +325,61 @@ def confirm_sources(
 @mine_app.command("execute")
 def mine_execute(run_id: str = typer.Option(..., help="Run ID")):
     """Start the borrower mining pipeline."""
-    console.print(f"[yellow]Starting pipeline for run {run_id}...[/yellow]")
-    # TODO: Wire up to job enqueue
+    async def _execute():
+        from uuid import UUID
+        from app.ai.llm_service import get_llm_service
+        from app.miner.pitchbook.mcp_client import get_pitchbook_adapter
+        from app.platform.persistence.database import async_session, init_db
+        from app.platform.persistence.repositories import CompanyRepository, ReviewRepository, RunRepository
+        from app.platform.persistence.storage import get_storage
+        from app.miner.engine import MinerEngine
+
+        await init_db()
+        async with async_session() as session:
+            run_repo = RunRepository(session)
+            run = await run_repo.get(run_id)
+            if not run:
+                console.print("[red]Run not found[/red]")
+                return
+
+            llm = get_llm_service()
+            pb = get_pitchbook_adapter()
+            storage = get_storage()
+            engine = MinerEngine(llm_service=llm, pitchbook_adapter=pb, storage=storage)
+
+            console.print(f"[yellow]Starting pipeline for run {run_id}...[/yellow]")
+            await run_repo.update_status(run_id, "running")
+
+            try:
+                results = await engine.execute_pipeline(UUID(run_id), run.config)
+
+                # Persist companies to DB
+                company_repo = CompanyRepository(session)
+                for company in engine.companies:
+                    await company_repo.upsert(company.model_dump(mode="json"))
+
+                # Persist review items
+                review_repo = ReviewRepository(session)
+                for item in engine.review_items:
+                    await review_repo.add(item.model_dump(mode="json"))
+
+                await run_repo.update_status(run_id, "completed")
+                console.print(f"[green]Pipeline complete![/green]")
+                for stage, result in results.items():
+                    console.print(f"  {stage}: {result.get('status', 'ok')}")
+                console.print(f"  Total companies: {len(engine.companies)}")
+
+            except Exception as e:
+                await run_repo.update_status(run_id, "failed")
+                console.print(f"[red]Pipeline failed: {e}[/red]")
+
+    _run_async(_execute())
 
 
 @mine_app.command("resume")
 def mine_resume(run_id: str = typer.Option(..., help="Run ID")):
     """Resume pipeline from last checkpoint."""
-    console.print(f"[yellow]Resuming pipeline for run {run_id}...[/yellow]")
+    console.print(f"[yellow]Resume not yet supported from CLI. Use API: POST /api/v1/runs/{run_id}/resume[/yellow]")
 
 
 @mine_app.command("rerun-stage")
@@ -223,7 +388,41 @@ def mine_rerun_stage(
     stage: str = typer.Option(..., help="Stage to re-run"),
 ):
     """Re-run a single pipeline stage."""
-    console.print(f"[yellow]Re-running stage {stage} for run {run_id}...[/yellow]")
+    async def _rerun():
+        from uuid import UUID
+        from app.ai.llm_service import get_llm_service
+        from app.miner.pitchbook.mcp_client import get_pitchbook_adapter
+        from app.platform.persistence.database import async_session, init_db
+        from app.platform.persistence.repositories import RunRepository
+        from app.platform.persistence.storage import get_storage
+        from app.platform.models.enums import WorkflowStage
+        from app.miner.engine import MinerEngine
+
+        await init_db()
+        async with async_session() as session:
+            run_repo = RunRepository(session)
+            run = await run_repo.get(run_id)
+            if not run:
+                console.print("[red]Run not found[/red]")
+                return
+
+            try:
+                ws = WorkflowStage(stage)
+            except ValueError:
+                console.print(f"[red]Unknown stage: {stage}[/red]")
+                console.print(f"Valid stages: {', '.join(s.value for s in WorkflowStage)}")
+                return
+
+            llm = get_llm_service()
+            pb = get_pitchbook_adapter()
+            storage = get_storage()
+            engine = MinerEngine(llm_service=llm, pitchbook_adapter=pb, storage=storage)
+
+            console.print(f"[yellow]Re-running stage {stage} for run {run_id}...[/yellow]")
+            result = await engine.rerun_stage(UUID(run_id), run.config, ws)
+            console.print(f"[green]Stage complete:[/green] {result}")
+
+    _run_async(_rerun())
 
 
 # ---- Review commands ----
@@ -231,7 +430,33 @@ def mine_rerun_stage(
 @review_app.command("list")
 def review_list(run_id: str = typer.Option(..., help="Run ID")):
     """List review queue items."""
-    console.print(f"[yellow]Listing review items for run {run_id}...[/yellow]")
+    async def _list():
+        from app.platform.persistence.database import async_session, init_db
+        from app.platform.persistence.repositories import ReviewRepository
+
+        await init_db()
+        async with async_session() as session:
+            repo = ReviewRepository(session)
+            items = await repo.list_by_run(run_id, resolved=False)
+            if not items:
+                console.print("[green]No pending review items[/green]")
+                return
+
+            table = Table(title=f"Review Queue for {run_id}")
+            table.add_column("ID")
+            table.add_column("Reason")
+            table.add_column("Details")
+            table.add_column("Created")
+            for item in items:
+                table.add_row(
+                    item.id[:8] + "...",
+                    item.reason,
+                    item.details[:60],
+                    item.created_at.isoformat(),
+                )
+            console.print(table)
+
+    _run_async(_list())
 
 
 @review_app.command("resolve")
@@ -240,7 +465,17 @@ def review_resolve(
     decision: str = typer.Option(..., help="Resolution: merge|keep_both|exclude|accept"),
 ):
     """Resolve a review queue item."""
-    console.print(f"[green]Resolved item {item_id} with decision: {decision}[/green]")
+    async def _resolve():
+        from app.platform.persistence.database import async_session, init_db
+        from app.platform.persistence.repositories import ReviewRepository
+
+        await init_db()
+        async with async_session() as session:
+            repo = ReviewRepository(session)
+            await repo.resolve(item_id, decision)
+            console.print(f"[green]Resolved item {item_id} with decision: {decision}[/green]")
+
+    _run_async(_resolve())
 
 
 # ---- Export commands ----
@@ -251,7 +486,31 @@ def export_run(
     format: str = typer.Option("excel", help="Export format: csv|json|excel|all"),
 ):
     """Export run results."""
-    console.print(f"[yellow]Exporting run {run_id} as {format}...[/yellow]")
+    async def _export():
+        from uuid import UUID
+        from app.platform.persistence.database import async_session, init_db
+        from app.platform.persistence.repositories import CompanyRepository
+        from app.platform.persistence.storage import get_storage
+        from app.platform.exports.service import ExportService
+
+        await init_db()
+        async with async_session() as session:
+            company_repo = CompanyRepository(session)
+            companies = await company_repo.list_by_run(run_id, limit=5000)
+            if not companies:
+                console.print("[yellow]No companies found for this run[/yellow]")
+                return
+
+            company_dicts = [c.data for c in companies]
+            storage = get_storage()
+            service = ExportService(storage)
+            manifest = await service.export_run(UUID(run_id), company_dicts, format=format)
+
+            console.print(f"[green]Export complete![/green]")
+            for exp in manifest.get("exports", []):
+                console.print(f"  {exp['format']}: {exp['path']} ({exp['row_count']} rows)")
+
+    _run_async(_export())
 
 
 # ---- Connector commands ----

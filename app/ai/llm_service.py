@@ -128,6 +128,25 @@ class MockLLMService(LLMService):
                 }
             ]
         }
+        # Pre-register web enrichment fixture for mock company enrichment
+        self._web_enrichment_response = {
+            "description": "Mock company providing specialized services",
+            "hq_city": "Dallas",
+            "hq_state": "TX",
+            "hq_country": "US",
+            "founded_year": 2008,
+            "employee_count": 175,
+            "revenue_estimate": 85.0,
+            "revenue_band": "$50M-$100M",
+            "ebitda_estimate": 14.0,
+            "recurring_revenue_estimate": 55.0,
+            "is_public": False,
+            "website": "https://example.com",
+            "industry_exposure_descriptor": "Data center and critical infrastructure",
+            "industry_exposure_intensity": "high",
+            "ownership_type": "founder_owned",
+            "confidence": 0.72,
+        }
 
     def register_fixture(self, key: str, response: Any) -> None:
         self._fixtures[key] = response
@@ -140,7 +159,13 @@ class MockLLMService(LLMService):
         temperature: float = 0.7,
     ) -> LLMResponse:
         logger.info("mock_llm_complete", prompt_length=len(prompt))
-        # Check fixtures for a matching key
+
+        # Detect web enrichment prompts and return enrichment fixture
+        if "enrichment data" in prompt.lower() or "research the following company" in prompt.lower():
+            content = json.dumps(self._web_enrichment_response)
+            return LLMResponse(content=content, model="mock", provider="mock")
+
+        # Check user-registered fixtures for a matching key
         for key, fixture in self._fixtures.items():
             if key.lower() in prompt.lower():
                 content = json.dumps(fixture) if isinstance(fixture, (dict, list)) else str(fixture)

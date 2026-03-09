@@ -11,13 +11,22 @@ logger = get_logger("miner.sources.registry")
 class SourceRegistry:
     """Maps source types to their adapter implementations."""
 
-    def __init__(self):
+    def __init__(self, use_mock: bool | None = None):
         self._adapters: dict[str, SourceAdapter] = {}
+        # Auto-detect mock mode from settings if not explicitly set
+        if use_mock is None:
+            from app.platform.config.settings import settings
+            use_mock = settings.llm_provider == "mock"
+        self._use_mock = use_mock
         self._register_defaults()
 
     def _register_defaults(self) -> None:
-        web = WebScraperAdapter()
-        # All source types default to web scraper for now
+        if self._use_mock:
+            from app.miner.sources.mock_adapter import MockSourceAdapter
+            adapter: SourceAdapter = MockSourceAdapter()
+        else:
+            adapter = WebScraperAdapter()
+
         for stype in [
             "trade_journal",
             "ranking_list",
@@ -27,15 +36,16 @@ class SourceRegistry:
             "manufacturer_partner",
             "conference_exhibitor",
             "regional_directory",
+            "naics_source",
             "other",
         ]:
-            self._adapters[stype] = web
+            self._adapters[stype] = adapter
 
     def register(self, source_type: str, adapter: SourceAdapter) -> None:
         self._adapters[source_type] = adapter
 
     def get_adapter(self, source_type: str) -> SourceAdapter | None:
-        return self._adapters.get(source_type)
+        return self._adapters.get(source_type, self._adapters.get("other"))
 
     async def extract_from_source(self, source_config: dict) -> list[RawCompany]:
         source_type = source_config.get("source_type", "other")
