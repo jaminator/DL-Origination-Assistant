@@ -62,7 +62,14 @@ def client(db_engine_and_session):
             yield session
 
     with patch("app.main.init_db", new_callable=AsyncMock), \
-         patch("app.main.close_db", new_callable=AsyncMock):
+         patch("app.main.close_db", new_callable=AsyncMock), \
+         patch("app.ai.llm_service.settings") as mock_settings:
+        # Force mock LLM regardless of .env
+        mock_settings.llm_provider = "mock"
+        mock_settings.llm_api_key = ""
+        mock_settings.llm_model = "mock"
+        mock_settings.llm_rate_limit_rpm = 50
+
         from app.main import app
         from app.platform.api.deps import get_db
 

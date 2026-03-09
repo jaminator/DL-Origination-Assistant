@@ -1,5 +1,6 @@
 """Generic web scraper adapter for company name extraction."""
 
+import asyncio
 import re
 
 import httpx
@@ -10,6 +11,11 @@ from app.platform.models.schemas import RawCompany
 from app.platform.utils.logging import get_logger
 
 logger = get_logger("miner.sources.web_scraper")
+
+# Retry configuration
+MAX_RETRIES = 3
+RETRY_BACKOFF_BASE = 2  # seconds
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 # Common patterns for company lists on web pages
 COMPANY_LIST_SELECTORS = [
@@ -101,15 +107,53 @@ class WebScraperAdapter(SourceAdapter):
             return False
 
     async def _fetch_page(self, url: str) -> str:
-        """Fetch a web page with reasonable defaults."""
+        """Fetch a web page with retry and exponential backoff."""
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; DL-Origination-Assistant/1.0)",
             "Accept": "text/html,application/xhtml+xml",
         }
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            resp = await client.get(url, headers=headers)
-            resp.raise_for_status()
-            return resp.text
+        last_exc: Exception | None = None
+
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+                    logger.info("web_scraper_fetch_start", url=url, attempt=attempt)
+                    resp = await client.get(url, headers=headers)
+
+                    if resp.status_code in RETRYABLE_STATUS_CODES:
+                        retry_after = float(resp.headers.get("Retry-After", RETRY_BACKOFF_BASE ** attempt))
+                        logger.warning(
+                            "web_scraper_retryable_status",
+                            url=url,
+                            status=resp.status_code,
+                            attempt=attempt,
+                            retry_after=retry_after,
+                        )
+                        if attempt < MAX_RETRIES:
+                            await asyncio.sleep(retry_after)
+                            continue
+
+                    resp.raise_for_status()
+                    logger.info(
+                        "web_scraper_fetch_complete",
+                        url=url,
+                        status=resp.status_code,
+                        content_length=len(resp.text),
+                        attempt=attempt,
+                    )
+                    return resp.text
+
+            except httpx.TimeoutException as exc:
+                logger.warning("web_scraper_timeout", url=url, attempt=attempt)
+                last_exc = exc
+            except httpx.RequestError as exc:
+                logger.warning("web_scraper_request_error", url=url, error=str(exc), attempt=attempt)
+                last_exc = exc
+
+            if attempt < MAX_RETRIES:
+                await asyncio.sleep(RETRY_BACKOFF_BASE ** attempt)
+
+        raise last_exc or RuntimeError(f"Failed to fetch {url} after {MAX_RETRIES} attempts")
 
     def _extract_with_selector(self, soup: BeautifulSoup, selector: str) -> list[str]:
         """Extract text from elements matching a CSS selector."""

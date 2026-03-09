@@ -1,11 +1,30 @@
 """Source registry — manages adapter dispatch for different source types."""
 
 from app.miner.sources.base_adapter import SourceAdapter
+from app.miner.sources.directory_adapter import DirectoryAdapter
+from app.miner.sources.naics_adapter import NAICSAdapter
 from app.miner.sources.web_scraper import WebScraperAdapter
 from app.platform.models.schemas import RawCompany
 from app.platform.utils.logging import get_logger
 
 logger = get_logger("miner.sources.registry")
+
+# Source types that use the directory adapter (structured member listings)
+DIRECTORY_SOURCE_TYPES = {
+    "association_directory",
+    "certification_directory",
+    "regional_directory",
+}
+
+# Source types that use the web scraper (unstructured pages, ranking lists)
+WEB_SCRAPER_SOURCE_TYPES = {
+    "trade_journal",
+    "ranking_list",
+    "dealer_locator",
+    "manufacturer_partner",
+    "conference_exhibitor",
+    "other",
+}
 
 
 class SourceRegistry:
@@ -23,23 +42,18 @@ class SourceRegistry:
     def _register_defaults(self) -> None:
         if self._use_mock:
             from app.miner.sources.mock_adapter import MockSourceAdapter
-            adapter: SourceAdapter = MockSourceAdapter()
+            mock = MockSourceAdapter()
+            for stype in WEB_SCRAPER_SOURCE_TYPES | DIRECTORY_SOURCE_TYPES | {"naics_source"}:
+                self._adapters[stype] = mock
         else:
-            adapter = WebScraperAdapter()
-
-        for stype in [
-            "trade_journal",
-            "ranking_list",
-            "association_directory",
-            "certification_directory",
-            "dealer_locator",
-            "manufacturer_partner",
-            "conference_exhibitor",
-            "regional_directory",
-            "naics_source",
-            "other",
-        ]:
-            self._adapters[stype] = adapter
+            web_scraper = WebScraperAdapter()
+            directory = DirectoryAdapter()
+            naics = NAICSAdapter()
+            for stype in WEB_SCRAPER_SOURCE_TYPES:
+                self._adapters[stype] = web_scraper
+            for stype in DIRECTORY_SOURCE_TYPES:
+                self._adapters[stype] = directory
+            self._adapters["naics_source"] = naics
 
     def register(self, source_type: str, adapter: SourceAdapter) -> None:
         self._adapters[source_type] = adapter

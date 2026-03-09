@@ -162,3 +162,104 @@ async def test_orchestrator_handles_failure(
         await orchestrator.run_pipeline(run_id, miner_engine=miner)
 
     mock_run_repo.update_status.assert_any_call(str(run_id), "failed")
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_resume_from_checkpoint(
+    run_id, run_config, mock_run_repo, mock_company_repo, mock_review_repo,
+):
+    """Resume skips already-completed stages and picks up from the next one."""
+    # Simulate a checkpoint at dispositioning (stage 4 of 10)
+    checkpoint = MagicMock()
+    checkpoint.stage = "dispositioning"
+
+    checkpoint_repo = AsyncMock()
+    checkpoint_repo.get_latest.return_value = checkpoint
+
+    miner = MinerEngine(
+        llm_service=MockLLMService(),
+        pitchbook_adapter=MockPitchBookClient(),
+        storage=LocalStorage("/tmp/test-resume"),
+        source_registry=SourceRegistry(use_mock=True),
+    )
+
+    orchestrator = WorkflowOrchestrator(
+        run_repo=mock_run_repo,
+        checkpoint_repo=checkpoint_repo,
+        company_repo=mock_company_repo,
+        review_repo=mock_review_repo,
+    )
+
+    result = await orchestrator.resume_pipeline(run_id, miner_engine=miner)
+
+    # Should have only run stages AFTER dispositioning (6 stages: pitchbook through export)
+    assert result is not None
+    assert "pitchbook_enrichment" in result
+    assert "export" in result
+    # Should NOT have run earlier stages
+    assert "name_generation" not in result
+    assert "dispositioning" not in result
+
+    checkpoint_repo.get_latest.assert_called_once_with(str(run_id))
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_resume_no_checkpoint_runs_full(
+    run_id, run_config, mock_run_repo, mock_company_repo, mock_review_repo,
+):
+    """Resume with no checkpoint runs the full pipeline."""
+    checkpoint_repo = AsyncMock()
+    checkpoint_repo.get_latest.return_value = None
+
+    miner = MinerEngine(
+        llm_service=MockLLMService(),
+        pitchbook_adapter=MockPitchBookClient(),
+        storage=LocalStorage("/tmp/test-resume-full"),
+        source_registry=SourceRegistry(use_mock=True),
+    )
+
+    orchestrator = WorkflowOrchestrator(
+        run_repo=mock_run_repo,
+        checkpoint_repo=checkpoint_repo,
+        company_repo=mock_company_repo,
+        review_repo=mock_review_repo,
+    )
+
+    result = await orchestrator.resume_pipeline(run_id, miner_engine=miner)
+
+    # Should run all 10 stages
+    assert len(result) == 10
+    assert "name_generation" in result
+    assert "export" in result
+
+
+@pytest.mark.asyncio
+async def test_checkpoint_save_and_load(tmp_path):
+    """CheckpointManager can save and load checkpoint data across calls."""
+    from app.platform.workflow.checkpoint import CheckpointManager
+
+    storage = LocalStorage(str(tmp_path))
+    manager = CheckpointManager(storage)
+    run_id = uuid4()
+
+    # Save checkpoint
+    saved = await manager.save_checkpoint(
+        run_id=run_id,
+        stage="web_enhancement",
+        data={"companies_enriched": 15},
+        company_count=15,
+        notes="Stage completed",
+    )
+    assert saved["stage"] == "web_enhancement"
+    assert saved["company_count"] == 15
+
+    # Load checkpoint (simulates process restart)
+    loaded = await manager.load_checkpoint(run_id, "web_enhancement")
+    assert loaded is not None
+    assert loaded["stage"] == "web_enhancement"
+    assert loaded["data"]["companies_enriched"] == 15
+    assert loaded["company_count"] == 15
+
+    # Loading a non-existent stage returns None
+    missing = await manager.load_checkpoint(run_id, "scoring")
+    assert missing is None

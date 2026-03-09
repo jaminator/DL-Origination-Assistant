@@ -1,6 +1,8 @@
-"""Tests for source adapters: NAICS, mock, web scraper heuristics."""
+"""Tests for source adapters: NAICS, mock, web scraper heuristics, retry logic."""
 
+from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 
 from app.miner.sources.mock_adapter import MockSourceAdapter
@@ -175,3 +177,159 @@ class TestWebScraperHeuristics:
         soup = BeautifulSoup(html, "html.parser")
         names = adapter._extract_with_heuristics(soup)
         assert len(names) >= 4
+
+
+# --- Web scraper retry tests ---
+
+
+def _make_response(status_code: int, text: str = "", headers: dict | None = None):
+    """Create a mock httpx.Response."""
+    return httpx.Response(
+        status_code=status_code,
+        text=text,
+        headers=headers or {},
+        request=httpx.Request("GET", "https://example.com"),
+    )
+
+
+class TestWebScraperRetry:
+
+    @pytest.mark.asyncio
+    async def test_fetch_page_retries_on_503(self):
+        """_fetch_page retries on 503 status codes."""
+        from app.miner.sources.web_scraper import WebScraperAdapter
+
+        adapter = WebScraperAdapter()
+        call_count = 0
+
+        async def mock_get(self_client, url, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return _make_response(503, "Service Unavailable")
+            return _make_response(200, "<html>OK</html>")
+
+        with patch.object(httpx.AsyncClient, "get", mock_get), \
+             patch("app.miner.sources.web_scraper.asyncio.sleep", new_callable=AsyncMock):
+            text = await adapter._fetch_page("https://example.com")
+            assert call_count == 2
+            assert "OK" in text
+
+    @pytest.mark.asyncio
+    async def test_fetch_page_retries_on_429_with_retry_after(self):
+        """_fetch_page respects Retry-After header on 429."""
+        from app.miner.sources.web_scraper import WebScraperAdapter
+
+        adapter = WebScraperAdapter()
+        call_count = 0
+        sleep_durations = []
+
+        async def mock_get(self_client, url, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return _make_response(429, "Rate limited", {"Retry-After": "1"})
+            return _make_response(200, "<html>OK</html>")
+
+        async def track_sleep(duration):
+            sleep_durations.append(duration)
+
+        with patch.object(httpx.AsyncClient, "get", mock_get), \
+             patch("app.miner.sources.web_scraper.asyncio.sleep", side_effect=track_sleep):
+            await adapter._fetch_page("https://example.com")
+            assert call_count == 2
+            assert sleep_durations[0] == 1.0
+
+    @pytest.mark.asyncio
+    async def test_fetch_page_retries_on_timeout(self):
+        """_fetch_page retries on timeout and succeeds."""
+        from app.miner.sources.web_scraper import WebScraperAdapter
+
+        adapter = WebScraperAdapter()
+        call_count = 0
+
+        async def mock_get(self_client, url, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise httpx.ReadTimeout("timed out")
+            return _make_response(200, "<html>OK</html>")
+
+        with patch.object(httpx.AsyncClient, "get", mock_get), \
+             patch("app.miner.sources.web_scraper.asyncio.sleep", new_callable=AsyncMock):
+            text = await adapter._fetch_page("https://example.com")
+            assert call_count == 2
+            assert "OK" in text
+
+    @pytest.mark.asyncio
+    async def test_fetch_page_exhausted_retries_raises(self):
+        """_fetch_page raises after all retries are exhausted."""
+        from app.miner.sources.web_scraper import WebScraperAdapter
+
+        adapter = WebScraperAdapter()
+
+        async def mock_get(self_client, url, **kwargs):
+            raise httpx.ConnectError("connection refused")
+
+        with patch.object(httpx.AsyncClient, "get", mock_get), \
+             patch("app.miner.sources.web_scraper.asyncio.sleep", new_callable=AsyncMock):
+            with pytest.raises(httpx.ConnectError):
+                await adapter._fetch_page("https://example.com")
+
+    @pytest.mark.asyncio
+    async def test_extract_companies_returns_empty_on_fetch_failure(self):
+        """extract_companies returns empty list when _fetch_page fails."""
+        from app.miner.sources.web_scraper import WebScraperAdapter
+
+        adapter = WebScraperAdapter()
+
+        async def mock_fetch(url):
+            raise httpx.ConnectError("connection refused")
+
+        adapter._fetch_page = mock_fetch
+        result = await adapter.extract_companies({
+            "url": "https://example.com/down",
+            "source_name": "test",
+        })
+        assert result == []
+
+
+class TestDirectoryAdapterRetry:
+
+    @pytest.mark.asyncio
+    async def test_fetch_page_retries_on_500(self):
+        """Directory _fetch_page retries on 500 and succeeds."""
+        from app.miner.sources.directory_adapter import DirectoryAdapter
+
+        adapter = DirectoryAdapter()
+        call_count = 0
+
+        async def mock_get(self_client, url, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return _make_response(500, "Internal Server Error")
+            return _make_response(200, "<html>OK</html>")
+
+        with patch.object(httpx.AsyncClient, "get", mock_get), \
+             patch("app.miner.sources.directory_adapter.asyncio.sleep", new_callable=AsyncMock):
+            text = await adapter._fetch_page("https://example.com")
+            assert call_count == 2
+            assert "OK" in text
+
+    @pytest.mark.asyncio
+    async def test_extract_companies_returns_empty_on_fetch_failure(self):
+        """Directory adapter returns empty after fetch failure."""
+        from app.miner.sources.directory_adapter import DirectoryAdapter
+
+        adapter = DirectoryAdapter()
+
+        async def mock_fetch(url):
+            raise httpx.ConnectError("connection refused")
+
+        adapter._fetch_page = mock_fetch
+        result = await adapter.extract_companies({
+            "url": "https://example.com/down",
+            "source_name": "test_dir",
+        })
+        assert result == []

@@ -86,19 +86,21 @@ class PitchBookRESTClient(PitchBookAdapter):
         path: str,
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Execute an HTTP request with retry / back-off."""
+        """Execute an HTTP request with retry / back-off and structured logging."""
         client = await self._get_client()
         last_exc: Exception | None = None
+
+        logger.info("pitchbook_request_start", method=method, path=path, params=params)
 
         for attempt in range(1, self._max_retries + 1):
             try:
                 response = await client.request(method, path, params=params)
 
                 if response.status_code == 429:
-                    # Rate-limited — back off
                     retry_after = float(response.headers.get("Retry-After", 2 * attempt))
                     logger.warning(
                         "pitchbook_rate_limited",
+                        path=path,
                         attempt=attempt,
                         retry_after=retry_after,
                     )
@@ -106,7 +108,17 @@ class PitchBookRESTClient(PitchBookAdapter):
                     continue
 
                 response.raise_for_status()
-                return response.json()
+                data = response.json()
+                item_count = len(data.get("items", data.get("results", []))) if isinstance(data, dict) else 0
+                logger.info(
+                    "pitchbook_request_complete",
+                    method=method,
+                    path=path,
+                    status=response.status_code,
+                    items=item_count,
+                    attempt=attempt,
+                )
+                return data
 
             except httpx.HTTPStatusError as exc:
                 logger.error(

@@ -37,16 +37,26 @@ source_templates:
     recommendation_priority: core
   - source_name: "ENR Top Specialty Contractors"
     source_type: ranking_list
-    url: "https://www.enr.com"
+    url: "https://www.enr.com/toplists"
+    css_selector: "table tbody tr"
     recommendation_priority: core
+    notes: "ENR Top Lists index page; individual lists require login"
   - source_name: "NETA Member Directory"
     source_type: association_directory
-    url: "https://www.netaworld.org"
+    url: "https://www.netaworld.org/find-a-neta-accredited-company"
+    member_selector: ".views-row, .company-listing"
     recommendation_priority: useful
+    notes: "May require JS rendering; fallback to NAICS codes"
   - source_name: "BICSI Member Directory"
     source_type: certification_directory
     url: "https://www.bicsi.org"
     recommendation_priority: useful
+    notes: "Member search is JS-rendered; use NAICS code 238210 as fallback"
+  - source_name: "Uptime Institute Member Directory"
+    source_type: association_directory
+    url: "https://uptimeinstitute.com"
+    recommendation_priority: useful
+    notes: "Uptime-certified data center service providers"
 
 naics_codes:
   - code: "238210"
