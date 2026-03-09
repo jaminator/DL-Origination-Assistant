@@ -1,6 +1,10 @@
 """Dispositioning rules — deterministic classification of companies."""
 
-from app.platform.config.defaults import DEFAULT_CASCADE_ANCHOR_THRESHOLD, DEFAULT_GEOGRAPHY_FILTER, DEFAULT_REVENUE_CEILING
+from app.platform.config.defaults import (
+    DEFAULT_CASCADE_ANCHOR_THRESHOLD,
+    DEFAULT_GEOGRAPHY_FILTER,
+    DEFAULT_REVENUE_CEILING,
+)
 from app.platform.models.enums import Disposition
 from app.platform.models.schemas import CompanyRecord
 from app.platform.utils.logging import get_logger

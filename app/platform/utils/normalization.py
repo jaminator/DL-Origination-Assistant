@@ -2,7 +2,6 @@
 
 import re
 
-
 LEGAL_SUFFIXES = [
     r"\bInc\.?$",
     r"\bIncorporated$",

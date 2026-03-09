@@ -1,11 +1,10 @@
 """Tests for source adapters: NAICS, mock, web scraper heuristics."""
 
+
 import pytest
-from unittest.mock import AsyncMock, patch
 
-from app.miner.sources.naics_adapter import NAICSAdapter, NAICS_DESCRIPTIONS
 from app.miner.sources.mock_adapter import MockSourceAdapter
-
+from app.miner.sources.naics_adapter import NAICS_DESCRIPTIONS, NAICSAdapter
 
 # --- NAICS adapter tests ---
 
@@ -146,8 +145,9 @@ class TestWebScraperHeuristics:
 
     @pytest.mark.asyncio
     async def test_extract_with_selector(self):
-        from app.miner.sources.web_scraper import WebScraperAdapter
         from bs4 import BeautifulSoup
+
+        from app.miner.sources.web_scraper import WebScraperAdapter
 
         adapter = WebScraperAdapter()
         html = "<ul><li>Company A</li><li>Company B</li><li>Company C</li></ul>"
@@ -157,8 +157,9 @@ class TestWebScraperHeuristics:
 
     @pytest.mark.asyncio
     async def test_extract_with_heuristics_table(self):
-        from app.miner.sources.web_scraper import WebScraperAdapter
         from bs4 import BeautifulSoup
+
+        from app.miner.sources.web_scraper import WebScraperAdapter
 
         adapter = WebScraperAdapter()
         html = """

@@ -36,7 +36,10 @@ def export_excel(companies: list[dict]) -> bytes:
 
     # Capital Structure sheet
     ws_capstruct = wb.create_sheet("Capital Structure")
-    cap_cols = ["canonical_name", "pb_entity_id", "facility_type", "facility_amount", "pricing", "lender_names", "close_date", "maturity_date"]
+    cap_cols = [
+        "canonical_name", "pb_entity_id", "facility_type", "facility_amount",
+        "pricing", "lender_names", "close_date", "maturity_date",
+    ]
     ws_capstruct.append(cap_cols)
     for company in companies:
         if company.get("has_debt"):

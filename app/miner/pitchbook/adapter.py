@@ -1,7 +1,6 @@
 """Abstract PitchBook adapter interface."""
 
 from abc import ABC, abstractmethod
-from typing import Any
 
 
 class PitchBookAdapter(ABC):

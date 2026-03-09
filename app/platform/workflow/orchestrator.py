@@ -66,7 +66,8 @@ class WorkflowOrchestrator:
             if self._run_repo:
                 await self._run_repo.update_stage(str(run_id), WorkflowStage.COMPLETED.value, RunStatus.COMPLETED.value)
 
-            logger.info("pipeline_complete", run_id=str(run_id), companies=len(miner_engine.companies) if miner_engine else 0)
+            company_count = len(miner_engine.companies) if miner_engine else 0
+            logger.info("pipeline_complete", run_id=str(run_id), companies=company_count)
             return result
         except Exception as e:
             logger.error("pipeline_failed", run_id=str(run_id), error=str(e))
@@ -145,7 +146,9 @@ class WorkflowOrchestrator:
             await self._review_repo.add(item.model_dump(mode="json"))
         logger.info("review_items_persisted", count=len(miner_engine.review_items))
 
-    async def _save_checkpoint(self, run_id: UUID, stage: str, company_count: int = 0, notes: str | None = None) -> None:
+    async def _save_checkpoint(
+        self, run_id: UUID, stage: str, company_count: int = 0, notes: str | None = None,
+    ) -> None:
         """Save a checkpoint to the database."""
         if not self._checkpoint_repo:
             return

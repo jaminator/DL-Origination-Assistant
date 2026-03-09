@@ -43,7 +43,8 @@ def check_mega_cap(company: CompanyRecord) -> ValidationResult:
     """Sanity check: public companies with very high revenue should not be primary candidates."""
     if company.is_public and company.revenue_estimate and company.revenue_estimate > 5000:
         if company.disposition == Disposition.PRIMARY:
-            return ValidationResult(False, "mega_cap_sanity", f"Public mega-cap (${company.revenue_estimate}M) as primary")
+            msg = f"Public mega-cap (${company.revenue_estimate}M) as primary"
+            return ValidationResult(False, "mega_cap_sanity", msg)
     return ValidationResult(True, "mega_cap_sanity")
 
 

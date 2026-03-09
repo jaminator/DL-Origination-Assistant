@@ -4,9 +4,9 @@ Tests the full workflow: create run → recommend → confirm → execute pipeli
 Uses mocked DB session and dependency overrides.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -121,8 +121,10 @@ class TestMinerEndpoints:
         mock_company.review_required = False
         mock_company.data = {}
 
-        with patch("app.platform.persistence.repositories.CompanyRepository.list_by_run", new_callable=AsyncMock) as mock_list, \
-             patch("app.platform.persistence.repositories.CompanyRepository.count_by_run", new_callable=AsyncMock) as mock_count:
+        list_path = "app.platform.persistence.repositories.CompanyRepository.list_by_run"
+        count_path = "app.platform.persistence.repositories.CompanyRepository.count_by_run"
+        with patch(list_path, new_callable=AsyncMock) as mock_list, \
+             patch(count_path, new_callable=AsyncMock) as mock_count:
             mock_list.return_value = [mock_company]
             mock_count.return_value = 1
             response = client.get("/api/v1/runs/run-abc/companies")
@@ -142,7 +144,8 @@ class TestMinerEndpoints:
         mock_item.resolution = None
         mock_item.data = {}
 
-        with patch("app.platform.persistence.repositories.ReviewRepository.list_by_run", new_callable=AsyncMock) as mock_list:
+        review_path = "app.platform.persistence.repositories.ReviewRepository.list_by_run"
+        with patch(review_path, new_callable=AsyncMock) as mock_list:
             mock_list.return_value = [mock_item]
             response = client.get("/api/v1/runs/run-abc/review-queue")
 
@@ -153,7 +156,8 @@ class TestMinerEndpoints:
 
     def test_resolve_review_item(self, client, mock_session):
         """POST resolve should mark item resolved."""
-        with patch("app.platform.persistence.repositories.ReviewRepository.resolve", new_callable=AsyncMock) as mock_resolve:
+        resolve_path = "app.platform.persistence.repositories.ReviewRepository.resolve"
+        with patch(resolve_path, new_callable=AsyncMock) as mock_resolve:
             response = client.post(
                 "/api/v1/runs/run-abc/review-queue/item-1/resolve",
                 json={"resolution": "merge"},
@@ -188,7 +192,8 @@ class TestExportEndpoints:
         mock_manifest.created_at = MagicMock(isoformat=lambda: "2026-01-01T00:00:00")
         mock_manifest.data = {"exports": [{"format": "csv", "path": "test.csv"}]}
 
-        with patch("app.platform.persistence.repositories.ExportRepository.list_by_run", new_callable=AsyncMock) as mock_list:
+        export_path = "app.platform.persistence.repositories.ExportRepository.list_by_run"
+        with patch(export_path, new_callable=AsyncMock) as mock_list:
             mock_list.return_value = [mock_manifest]
             response = client.get("/api/v1/runs/run-abc/exports")
 
@@ -205,7 +210,8 @@ class TestExportEndpoints:
         mock_cp.created_at = MagicMock(isoformat=lambda: "2026-01-01T00:00:00")
         mock_cp.notes = "Post-scoring checkpoint"
 
-        with patch("app.platform.persistence.repositories.CheckpointRepository.list_by_run", new_callable=AsyncMock) as mock_list:
+        cp_path = "app.platform.persistence.repositories.CheckpointRepository.list_by_run"
+        with patch(cp_path, new_callable=AsyncMock) as mock_list:
             mock_list.return_value = [mock_cp]
             response = client.get("/api/v1/runs/run-abc/checkpoints")
 

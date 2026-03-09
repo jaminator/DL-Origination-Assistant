@@ -1,8 +1,6 @@
 """Typer CLI entrypoint for the DL Origination platform."""
 
 import asyncio
-import json
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -46,7 +44,7 @@ def run_create(
     theme: str = typer.Option(..., help="Investment theme"),
     geography: str = typer.Option("US", help="Geography filter"),
     revenue_ceiling: float = typer.Option(1000.0, help="Revenue ceiling in $M"),
-    profile: Optional[str] = typer.Option(None, help="Industry profile name"),
+    profile: str | None = typer.Option(None, help="Industry profile name"),
 ):
     """Create a new origination run."""
     async def _create():
@@ -128,10 +126,11 @@ def recommend_subverticals(run_id: str = typer.Option(..., help="Run ID")):
     """Generate sub-vertical recommendations."""
     async def _recommend():
         from uuid import UUID
+
         from app.ai.llm_service import get_llm_service
+        from app.platform.models.run import RunConfig
         from app.platform.persistence.database import async_session
         from app.platform.persistence.repositories import RecommendationRepository, RunRepository
-        from app.platform.models.run import RunConfig
         from app.recommender.engine import RecommenderEngine
 
         async with async_session() as session:
@@ -178,6 +177,7 @@ def recommend_sources(run_id: str = typer.Option(..., help="Run ID")):
     """Generate source recommendations for confirmed sub-verticals."""
     async def _recommend():
         from uuid import UUID
+
         from app.ai.llm_service import get_llm_service
         from app.platform.persistence.database import async_session
         from app.platform.persistence.repositories import RecommendationRepository, RunRepository
@@ -199,7 +199,10 @@ def recommend_sources(run_id: str = typer.Option(..., help="Run ID")):
                 selected = [r.subvertical_name for r in recs]
 
             if not selected:
-                console.print("[red]No sub-verticals selected. Run 'recommend subverticals' and 'confirm subverticals' first.[/red]")
+                console.print(
+                    "[red]No sub-verticals selected."
+                    " Run 'recommend subverticals' and 'confirm subverticals' first.[/red]"
+                )
                 return
 
             llm = get_llm_service()
@@ -238,7 +241,7 @@ def recommend_sources(run_id: str = typer.Option(..., help="Run ID")):
 def confirm_subverticals(
     run_id: str = typer.Option(..., help="Run ID"),
     accept_all: bool = typer.Option(False, help="Accept all recommendations"),
-    select: Optional[str] = typer.Option(None, help="Comma-separated indices to select (e.g., 1,3,5)"),
+    select: str | None = typer.Option(None, help="Comma-separated indices to select (e.g., 1,3,5)"),
 ):
     """Confirm sub-vertical selections."""
     async def _confirm():
@@ -327,12 +330,13 @@ def mine_execute(run_id: str = typer.Option(..., help="Run ID")):
     """Start the borrower mining pipeline."""
     async def _execute():
         from uuid import UUID
+
         from app.ai.llm_service import get_llm_service
+        from app.miner.engine import MinerEngine
         from app.miner.pitchbook.mcp_client import get_pitchbook_adapter
         from app.platform.persistence.database import async_session, init_db
         from app.platform.persistence.repositories import CompanyRepository, ReviewRepository, RunRepository
         from app.platform.persistence.storage import get_storage
-        from app.miner.engine import MinerEngine
 
         await init_db()
         async with async_session() as session:
@@ -364,7 +368,7 @@ def mine_execute(run_id: str = typer.Option(..., help="Run ID")):
                     await review_repo.add(item.model_dump(mode="json"))
 
                 await run_repo.update_status(run_id, "completed")
-                console.print(f"[green]Pipeline complete![/green]")
+                console.print("[green]Pipeline complete![/green]")
                 for stage, result in results.items():
                     console.print(f"  {stage}: {result.get('status', 'ok')}")
                 console.print(f"  Total companies: {len(engine.companies)}")
@@ -390,13 +394,14 @@ def mine_rerun_stage(
     """Re-run a single pipeline stage."""
     async def _rerun():
         from uuid import UUID
+
         from app.ai.llm_service import get_llm_service
+        from app.miner.engine import MinerEngine
         from app.miner.pitchbook.mcp_client import get_pitchbook_adapter
+        from app.platform.models.enums import WorkflowStage
         from app.platform.persistence.database import async_session, init_db
         from app.platform.persistence.repositories import RunRepository
         from app.platform.persistence.storage import get_storage
-        from app.platform.models.enums import WorkflowStage
-        from app.miner.engine import MinerEngine
 
         await init_db()
         async with async_session() as session:
@@ -488,10 +493,11 @@ def export_run(
     """Export run results."""
     async def _export():
         from uuid import UUID
+
+        from app.platform.exports.service import ExportService
         from app.platform.persistence.database import async_session, init_db
         from app.platform.persistence.repositories import CompanyRepository
         from app.platform.persistence.storage import get_storage
-        from app.platform.exports.service import ExportService
 
         await init_db()
         async with async_session() as session:
@@ -506,7 +512,7 @@ def export_run(
             service = ExportService(storage)
             manifest = await service.export_run(UUID(run_id), company_dicts, format=format)
 
-            console.print(f"[green]Export complete![/green]")
+            console.print("[green]Export complete![/green]")
             for exp in manifest.get("exports", []):
                 console.print(f"  {exp['format']}: {exp['path']} ({exp['row_count']} rows)")
 

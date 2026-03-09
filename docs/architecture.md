@@ -267,4 +267,62 @@ tests/
 └── conftest.py              # Shared fixtures
 ```
 
-All tests run with `pytest tests/ -v` — no external services required.
+All 152 tests run with `pytest tests/ -v` — no external services required.
+
+## Implementation Status
+
+### Fully Implemented (production-ready with mocks)
+
+| Component | Status | Notes |
+|---|---|---|
+| FastAPI app factory + lifespan | **Complete** | `create_app()` pattern, CORS, 6 router modules |
+| Pydantic domain models | **Complete** | CompanyRecord, RunConfig, ReviewQueueItem, AIProvenance, all enums |
+| Recommender Engine | **Complete** | Theme → sub-verticals → sources via LLM prompts |
+| Miner Engine (10 stages) | **Complete** | Full pipeline with checkpoint/resume support |
+| MockLLMService | **Complete** | Fixture-based responses, keyword detection, deterministic |
+| MockPitchBookClient | **Complete** | Synthetic ownership, debt, competitor data |
+| MockSourceAdapter | **Complete** | Source-type-aware synthetic company generation |
+| Fuzzy dedup (RapidFuzz) | **Complete** | Configurable thresholds, merge vs review routing |
+| Deterministic dispositioning | **Complete** | Revenue/geography/public-company rules |
+| Company scoring | **Complete** | 6-factor weighted formula with ownership bonuses |
+| QA validation gates | **Complete** | 6 checks: cascade bleed, unknown ownership, mega-cap, completeness, geography, stale data |
+| Review queue generation | **Complete** | From dedup ambiguity + QA failures |
+| Export (CSV, JSONL, Excel) | **Complete** | Multi-sheet Excel with outreach + capital structure tabs |
+| Checkpoint save/load | **Complete** | JSON serialization via LocalStorage |
+| LocalStorage | **Complete** | File-based persistence with async API |
+| Config hierarchy | **Complete** | .env → YAML profiles → hardcoded defaults |
+| CLI (Typer + Rich) | **Complete** | All commands wired (requires DB for most operations) |
+| Docker Compose | **Complete** | 4-service stack (api, worker, db, redis) |
+| Name normalization | **Complete** | Suffix stripping, whitespace/punctuation normalization |
+| Structured logging (structlog) | **Complete** | JSON output, stage-level events |
+| AI provenance framework | **Complete** | AIProvenance model with confidence + acceptance tracking |
+| Prompt template system | **Complete** | Versioned prompts with structured output parsing |
+
+### Stub / Skeleton (requires real credentials to activate)
+
+| Component | Status | What's Missing |
+|---|---|---|
+| ClaudeLLMService | **Stub** | HTTP call structure exists; untested without API key |
+| MCPPitchBookClient | **Stub** | Interface defined; MCP tool calls are placeholder `pass` |
+| WebScraperAdapter | **Partial** | httpx + BeautifulSoup extraction works; no real URLs configured |
+| DirectoryAdapter | **Partial** | Scraping logic exists; no real directory URLs |
+| ResearchOrchestrator | **Stub** | Batch/retry framework exists; no integration with real connectors |
+| ARQ worker | **Stub** | Worker config exists; requires Redis to activate |
+| Alembic migrations | **Scaffold** | `env.py` configured; no migration versions generated |
+| ORM models | **Complete** | SQLAlchemy tables defined; untested against real PostgreSQL |
+| Repository layer | **Complete** | Full CRUD; untested against real PostgreSQL |
+| Auth boundary | **Stub** | `get_current_user` returns dummy; `AUTH_ENABLED` flag exists |
+
+### Not Implemented (documented in plan, not started)
+
+| Component | Plan Section | Notes |
+|---|---|---|
+| Real web search MCP connector | Deferred (V2) | Brave Search / SerpAPI integration |
+| Internal knowledge base MCP | Deferred (V2) | Company-specific heuristics |
+| CRM/Deal MCP connector | Deferred (V2) | Pipeline integration |
+| AI-assisted review triage | Deferred | LLM summarization of review items |
+| Outreach brief generation | Deferred | LLM-generated company briefs |
+| Multi-user / RBAC | Deferred | Single-user local dev only |
+| S3 storage backend | Planned | Interface exists; implementation not written |
+| Prometheus metrics | Planned | No metrics endpoint |
+| SSO / OAuth2 | Planned | Auth boundary stubs only |

@@ -3,7 +3,6 @@
 import csv
 import io
 
-
 EXPORT_COLUMNS = [
     "canonical_name", "hq_city", "hq_state", "hq_country",
     "subvertical_tags", "industry_exposure_descriptor", "industry_exposure_intensity",

@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 
 from app.ai.llm_service import MockLLMService
-from app.platform.models.enums import RecommendationStatus, SourceAccessType, SourcePriority
+from app.platform.models.enums import RecommendationStatus
 from app.platform.models.run import RunConfig
 from app.recommender.engine import RecommenderEngine
 

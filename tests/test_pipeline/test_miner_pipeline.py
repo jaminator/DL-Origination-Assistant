@@ -1,6 +1,5 @@
 """Integration tests for the full miner pipeline with mock adapters."""
 
-import tempfile
 from uuid import uuid4
 
 import pytest
@@ -8,9 +7,8 @@ import pytest
 from app.ai.llm_service import MockLLMService
 from app.miner.engine import MinerEngine
 from app.miner.pitchbook.mock_client import MockPitchBookClient
-from app.miner.sources.mock_adapter import MockSourceAdapter
 from app.miner.sources.registry import SourceRegistry
-from app.platform.models.enums import Disposition, OwnershipTier, PitchBookStatus, WorkflowStage
+from app.platform.models.enums import Disposition, OwnershipTier, PitchBookStatus
 from app.platform.persistence.storage import LocalStorage
 
 
@@ -125,7 +123,8 @@ async def test_dispositioning(miner, run_id, run_config):
 
     # Mock companies with $85M revenue should be PRIMARY
     for c in miner.companies:
-        assert c.disposition in (Disposition.PRIMARY, Disposition.CASCADE_ANCHOR, Disposition.EXCLUDE, Disposition.WATCH)
+        valid = (Disposition.PRIMARY, Disposition.CASCADE_ANCHOR, Disposition.EXCLUDE, Disposition.WATCH)
+        assert c.disposition in valid
 
 
 @pytest.mark.asyncio

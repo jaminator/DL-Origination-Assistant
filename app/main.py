@@ -18,33 +18,40 @@ async def lifespan(app: FastAPI):
     await close_db()
 
 
-app = FastAPI(
-    title="DL Origination Assistant",
-    description="Direct-lending origination target mining platform",
-    version="0.1.0",
-    lifespan=lifespan,
-)
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    application = FastAPI(
+        title="DL Origination Assistant",
+        description="Direct-lending origination target mining platform",
+        version="0.1.0",
+        lifespan=lifespan,
+    )
 
-# CORS — permissive for local dev; restrict for production
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    # CORS — permissive for local dev; restrict for production
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-# Include routers
-from app.platform.api.connectors import router as connectors_router
-from app.platform.api.exports import router as exports_router
-from app.platform.api.health import router as health_router
-from app.platform.api.miner_routes import router as miner_router
-from app.platform.api.recommender_routes import router as recommender_router
-from app.platform.api.runs import router as runs_router
+    # Include routers
+    from app.platform.api.connectors import router as connectors_router
+    from app.platform.api.exports import router as exports_router
+    from app.platform.api.health import router as health_router
+    from app.platform.api.miner_routes import router as miner_router
+    from app.platform.api.recommender_routes import router as recommender_router
+    from app.platform.api.runs import router as runs_router
 
-app.include_router(health_router, prefix="/api/v1")
-app.include_router(runs_router, prefix="/api/v1")
-app.include_router(recommender_router, prefix="/api/v1")
-app.include_router(miner_router, prefix="/api/v1")
-app.include_router(exports_router, prefix="/api/v1")
-app.include_router(connectors_router, prefix="/api/v1")
+    application.include_router(health_router, prefix="/api/v1")
+    application.include_router(runs_router, prefix="/api/v1")
+    application.include_router(recommender_router, prefix="/api/v1")
+    application.include_router(miner_router, prefix="/api/v1")
+    application.include_router(exports_router, prefix="/api/v1")
+    application.include_router(connectors_router, prefix="/api/v1")
+
+    return application
+
+
+app = create_app()

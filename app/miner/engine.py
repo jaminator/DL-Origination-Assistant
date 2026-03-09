@@ -288,7 +288,8 @@ class MinerEngine:
         not_found = 0
 
         # Only enrich primary, watch, and cascade anchor companies (skip excluded)
-        targets = [c for c in self._companies if c.disposition in (Disposition.PRIMARY, Disposition.WATCH, Disposition.CASCADE_ANCHOR)]
+        eligible = (Disposition.PRIMARY, Disposition.WATCH, Disposition.CASCADE_ANCHOR)
+        targets = [c for c in self._companies if c.disposition in eligible]
 
         for company in targets:
             try:
@@ -511,7 +512,10 @@ class MinerEngine:
 def _map_ownership_to_tier(ownership_type: str) -> OwnershipTier:
     """Map ownership type strings to tier enum."""
     tier_a = {"founder_owned", "family_owned", "privately_held", "founder/family"}
-    tier_b = {"family_office_backed", "vc_backed", "growth_equity_backed", "family_office", "venture_capital", "growth_equity"}
+    tier_b = {
+        "family_office_backed", "vc_backed", "growth_equity_backed",
+        "family_office", "venture_capital", "growth_equity",
+    }
     tier_c = {"pe_backed", "private_equity", "sponsor_backed"}
 
     ot = ownership_type.lower().replace(" ", "_")

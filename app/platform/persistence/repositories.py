@@ -1,14 +1,13 @@
 """Repository pattern for database operations."""
 
 from datetime import datetime
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.platform.models.orm import (
     CheckpointRow,
-    CompanyEvidenceRow,
     CompanyRow,
     ExportManifestRow,
     ReviewQueueRow,
@@ -101,7 +100,10 @@ class CheckpointRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create(self, run_id: str, stage: str, company_count: int, artifact_path: str, notes: str | None = None) -> CheckpointRow:
+    async def create(
+        self, run_id: str, stage: str, company_count: int,
+        artifact_path: str, notes: str | None = None,
+    ) -> CheckpointRow:
         row = CheckpointRow(
             id=str(uuid4()),
             run_id=run_id,
@@ -117,7 +119,10 @@ class CheckpointRepository:
 
     async def get_latest(self, run_id: str) -> CheckpointRow | None:
         result = await self.session.execute(
-            select(CheckpointRow).where(CheckpointRow.run_id == run_id).order_by(CheckpointRow.created_at.desc()).limit(1)
+            select(CheckpointRow)
+            .where(CheckpointRow.run_id == run_id)
+            .order_by(CheckpointRow.created_at.desc())
+            .limit(1)
         )
         return result.scalar_one_or_none()
 
@@ -239,6 +244,8 @@ class ExportRepository:
 
     async def list_by_run(self, run_id: str) -> list[ExportManifestRow]:
         result = await self.session.execute(
-            select(ExportManifestRow).where(ExportManifestRow.run_id == run_id).order_by(ExportManifestRow.created_at.desc())
+            select(ExportManifestRow)
+            .where(ExportManifestRow.run_id == run_id)
+            .order_by(ExportManifestRow.created_at.desc())
         )
         return list(result.scalars().all())

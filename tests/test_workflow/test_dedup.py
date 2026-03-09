@@ -2,14 +2,11 @@
 
 from uuid import uuid4
 
-import pytest
-
 from app.miner.dedup import deduplicate_names
 from app.miner.dispositioning import assign_disposition
-from app.platform.models.enums import Disposition, OwnershipTier, ReviewReason
+from app.platform.models.enums import Disposition, ReviewReason
 from app.platform.models.schemas import CompanyRecord
 from app.platform.review.queue import generate_review_items_from_dedup, generate_review_items_from_validation
-
 
 # --- Dedup tests ---
 

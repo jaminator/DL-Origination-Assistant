@@ -12,7 +12,10 @@ logger = get_logger("miner.enrichment.web_enricher")
 
 # Ownership type string → tier mapping
 _TIER_A = {"founder_owned", "family_owned", "privately_held", "founder/family"}
-_TIER_B = {"family_office_backed", "vc_backed", "growth_equity_backed", "family_office", "venture_capital", "growth_equity"}
+_TIER_B = {
+    "family_office_backed", "vc_backed", "growth_equity_backed",
+    "family_office", "venture_capital", "growth_equity",
+}
 _TIER_C = {"pe_backed", "private_equity", "sponsor_backed"}
 
 

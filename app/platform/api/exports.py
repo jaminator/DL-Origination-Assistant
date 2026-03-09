@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.platform.api.deps import get_db, get_file_storage
 from app.platform.persistence.repositories import CompanyRepository, ExportRepository, RunRepository
-from app.platform.persistence.storage import StorageBackend
 
 router = APIRouter(prefix="/runs", tags=["exports"])
 
@@ -26,8 +25,9 @@ async def trigger_export(
     session: AsyncSession = Depends(get_db),
 ):
     """Trigger export generation."""
-    from app.platform.exports.service import ExportService
     from uuid import UUID
+
+    from app.platform.exports.service import ExportService
 
     run_repo = RunRepository(session)
     run = await run_repo.get(run_id)
@@ -69,6 +69,8 @@ async def download_export(run_id: str, export_id: str):
                 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             elif f.endswith(".jsonl"):
                 content_type = "application/jsonl"
-            return Response(content=data, media_type=content_type, headers={"Content-Disposition": f'attachment; filename="{f.split("/")[-1]}"'})
+            filename = f.split("/")[-1]
+            headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+            return Response(content=data, media_type=content_type, headers=headers)
 
     raise HTTPException(status_code=404, detail="Export file not found")

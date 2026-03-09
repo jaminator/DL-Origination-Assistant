@@ -77,7 +77,7 @@ pytest tests/ --cov=app --cov-report=term-missing
 pytest tests/test_pipeline/ -v
 ```
 
-All 113 tests run with mock providers — no external services required.
+All 152 tests run with mock providers — no external services required.
 
 ### CLI Usage
 

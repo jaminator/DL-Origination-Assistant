@@ -83,7 +83,7 @@ async def execute_run(run_id: str, session: AsyncSession = Depends(get_db)):
     from app.ai.llm_service import get_llm_service
     from app.miner.engine import MinerEngine
     from app.miner.pitchbook.mcp_client import get_pitchbook_adapter
-    from app.platform.persistence.repositories import CompanyRepository, CheckpointRepository, ReviewRepository
+    from app.platform.persistence.repositories import CheckpointRepository, CompanyRepository, ReviewRepository
     from app.platform.persistence.storage import get_storage
     from app.platform.workflow.orchestrator import WorkflowOrchestrator
 
@@ -121,7 +121,7 @@ async def resume_run(run_id: str, session: AsyncSession = Depends(get_db)):
     from app.ai.llm_service import get_llm_service
     from app.miner.engine import MinerEngine
     from app.miner.pitchbook.mcp_client import get_pitchbook_adapter
-    from app.platform.persistence.repositories import CompanyRepository, CheckpointRepository, ReviewRepository
+    from app.platform.persistence.repositories import CheckpointRepository, CompanyRepository, ReviewRepository
     from app.platform.persistence.storage import get_storage
     from app.platform.workflow.orchestrator import WorkflowOrchestrator
 

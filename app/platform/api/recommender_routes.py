@@ -25,8 +25,9 @@ class ConfirmSourcesRequest(BaseModel):
 async def recommend_subverticals(run_id: str, session: AsyncSession = Depends(get_db)):
     """Generate AI sub-vertical recommendations for a run's theme."""
     from uuid import UUID
-    from app.recommender.engine import RecommenderEngine
+
     from app.platform.models.run import RunConfig
+    from app.recommender.engine import RecommenderEngine
 
     run_repo = RunRepository(session)
     run = await run_repo.get(run_id)
@@ -108,6 +109,7 @@ async def confirm_subverticals(
 async def recommend_sources(run_id: str, session: AsyncSession = Depends(get_db)):
     """Generate AI source recommendations for confirmed sub-verticals."""
     from uuid import UUID
+
     from app.recommender.engine import RecommenderEngine
 
     run_repo = RunRepository(session)

@@ -1,20 +1,20 @@
 """Tests for miner enrichment modules: size estimator, exposure classifier, web enricher."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
+import pytest
+
+from app.miner.enrichment.exposure_classifier import (
+    classify_exposure_intensity,
+    compute_exposure_score,
+)
 from app.miner.enrichment.size_estimator import (
     classify_revenue_band,
     estimate_employee_band,
     estimate_revenue_from_employees,
     extract_revenue_from_text,
 )
-from app.miner.enrichment.exposure_classifier import (
-    classify_exposure_intensity,
-    compute_exposure_score,
-)
-
 
 # --- Size estimator tests ---
 

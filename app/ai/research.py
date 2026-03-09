@@ -1,7 +1,8 @@
 """Research orchestration for batch AI/MCP workflows with retries and rate limiting."""
 
 import asyncio
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable, Coroutine
+from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field

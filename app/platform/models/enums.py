@@ -1,51 +1,51 @@
 """Canonical enums used across the DL Origination platform."""
 
-from enum import Enum
+from enum import StrEnum
 
 
-class RecommendationStatus(str, Enum):
+class RecommendationStatus(StrEnum):
     STRONG_FIT = "strong_fit"
     MODERATE_FIT = "moderate_fit"
     WATCHLIST = "watchlist"
     AVOID = "avoid"
 
 
-class SourceAccessType(str, Enum):
+class SourceAccessType(StrEnum):
     PUBLIC_SCRAPE = "public_scrape"
     PUBLIC_MANUAL = "public_manual"
     LOGIN_REQUIRED = "login_required"
     PARTIAL_SCRAPE = "partial_scrape"
 
 
-class SourcePriority(str, Enum):
+class SourcePriority(StrEnum):
     CORE = "core"
     USEFUL = "useful"
     OPTIONAL = "optional"
     MANUAL_ONLY = "manual_only"
 
 
-class Disposition(str, Enum):
+class Disposition(StrEnum):
     PRIMARY = "primary"
     CASCADE_ANCHOR = "cascade_anchor"
     EXCLUDE = "exclude"
     WATCH = "watch"
 
 
-class OwnershipTier(str, Enum):
+class OwnershipTier(StrEnum):
     TIER_A = "tier_a"
     TIER_B = "tier_b"
     TIER_C = "tier_c"
     UNKNOWN = "unknown"
 
 
-class DataQualityTag(str, Enum):
+class DataQualityTag(StrEnum):
     CLEAN = "clean"
     WEB_EST = "web_est"
     STALE = "stale"
     ALL_INFERRED = "all_inferred"
 
 
-class PitchBookStatus(str, Enum):
+class PitchBookStatus(StrEnum):
     PENDING = "pending"
     MATCHED = "matched"
     NOT_FOUND = "not_found"
@@ -53,7 +53,7 @@ class PitchBookStatus(str, Enum):
     ERROR = "error"
 
 
-class WorkflowStage(str, Enum):
+class WorkflowStage(StrEnum):
     THEME_INTAKE = "theme_intake"
     SUBVERTICAL_RECOMMENDATION = "subvertical_recommendation"
     SUBVERTICAL_CONFIRMATION = "subvertical_confirmation"
@@ -72,7 +72,7 @@ class WorkflowStage(str, Enum):
     COMPLETED = "completed"
 
 
-class ReviewReason(str, Enum):
+class ReviewReason(StrEnum):
     AMBIGUOUS_DUPLICATE = "ambiguous_duplicate"
     UNKNOWN_OWNERSHIP = "unknown_ownership"
     BOUNDARY_SIZE = "boundary_size"
@@ -83,7 +83,7 @@ class ReviewReason(str, Enum):
     SOURCE_ACCESS_LIMITED = "source_access_limited"
 
 
-class RunStatus(str, Enum):
+class RunStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     PAUSED = "paused"
@@ -91,7 +91,7 @@ class RunStatus(str, Enum):
     FAILED = "failed"
 
 
-class AcceptanceStatus(str, Enum):
+class AcceptanceStatus(StrEnum):
     PENDING = "pending"
     AUTO_ACCEPTED = "auto_accepted"
     HUMAN_ACCEPTED = "human_accepted"
