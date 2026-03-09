@@ -19,10 +19,14 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_rate_limit_rpm: int = 50
 
-    # PitchBook MCP
-    pitchbook_provider: str = "mock"  # "mcp" or "mock"
+    # PitchBook
+    pitchbook_provider: str = "mock"  # "rest", "mcp", or "mock"
     mcp_pitchbook_url: str = ""
     mcp_pitchbook_token: str = ""
+    pitchbook_api_base_url: str = "https://api.pitchbook.com/v2"
+    pitchbook_api_key: str = ""
+    pitchbook_api_timeout: float = 30.0
+    pitchbook_api_max_retries: int = 3
 
     # AI confidence
     ai_confidence_auto_accept_threshold: float = 0.85
