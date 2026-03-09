@@ -66,7 +66,8 @@ app/
 │   └── pitchbook/
 │       ├── adapter.py               # PitchBookAdapter ABC
 │       ├── mock_client.py           # Synthetic PitchBook data
-│       └── mcp_client.py            # Real PitchBook via MCP (future)
+│       ├── rest_client.py           # PitchBook REST API v2 client
+│       └── mcp_client.py            # PitchBook via MCP + adapter factory
 │
 └── platform/                        # Shared Platform Layer
     ├── api/                         # FastAPI route modules
@@ -193,6 +194,8 @@ Stage 10: export
 All external dependencies have mock implementations:
 - `LLM_PROVIDER=mock` → `MockLLMService` with fixture responses
 - `PITCHBOOK_PROVIDER=mock` → `MockPitchBookClient` with synthetic data
+- `PITCHBOOK_PROVIDER=rest` → `PitchBookRESTClient` with real API (requires `PITCHBOOK_API_KEY`)
+- `PITCHBOOK_PROVIDER=mcp` → `PitchBookMCPClient` (stubbed; requires MCP server)
 - `SourceRegistry` auto-detects mock mode → `MockSourceAdapter`
 
 The full pipeline runs end-to-end without any API keys or external services.
@@ -284,6 +287,7 @@ All 200 tests run with `pytest tests/ -v` — no external services required.
 | ClaudeLLMService | **Complete** | Retry/backoff, auth validation, rate limit, error handling, validated live |
 | MockLLMService | **Complete** | Fixture-based responses, keyword detection, deterministic |
 | MockPitchBookClient | **Complete** | Synthetic ownership, debt, competitor data |
+| PitchBookRESTClient | **Complete** | REST API v2 client with retry/backoff (requires API key) |
 | MockSourceAdapter | **Complete** | Source-type-aware synthetic company generation |
 | Fuzzy dedup (RapidFuzz) | **Complete** | Configurable thresholds, merge vs review routing |
 | Deterministic dispositioning | **Complete** | Revenue/geography/public-company rules |
@@ -308,7 +312,7 @@ All 200 tests run with `pytest tests/ -v` — no external services required.
 
 | Component | Status | What's Missing |
 |---|---|---|
-| MCPPitchBookClient | **Stub** | Interface defined; MCP tool calls are placeholder `pass` |
+| PitchBookMCPClient | **Stub** | Interface defined; MCP tool calls raise NotImplementedError |
 | WebScraperAdapter | **Partial** | httpx + BeautifulSoup extraction works; no real URLs configured |
 | DirectoryAdapter | **Partial** | Scraping logic exists; no real directory URLs |
 | ResearchOrchestrator | **Stub** | Batch/retry framework exists; no integration with real connectors |

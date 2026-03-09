@@ -13,6 +13,7 @@ Reference:
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
@@ -101,7 +102,6 @@ class PitchBookRESTClient(PitchBookAdapter):
                         attempt=attempt,
                         retry_after=retry_after,
                     )
-                    import asyncio
                     await asyncio.sleep(retry_after)
                     continue
 
@@ -117,7 +117,6 @@ class PitchBookRESTClient(PitchBookAdapter):
                 )
                 last_exc = exc
                 if exc.response.status_code in {500, 502, 503, 504}:
-                    import asyncio
                     await asyncio.sleep(2 ** attempt)
                     continue
                 raise
@@ -130,7 +129,6 @@ class PitchBookRESTClient(PitchBookAdapter):
                     attempt=attempt,
                 )
                 last_exc = exc
-                import asyncio
                 await asyncio.sleep(2 ** attempt)
 
         raise RuntimeError(
@@ -254,9 +252,7 @@ def _normalize_company_search_result(raw: dict, query_name: str) -> dict:
         "primary_industry": (
             raw.get("primaryIndustryCode")
             or raw.get("primaryIndustrySector")
-            or raw.get("verticals", [""])[0]
-            if isinstance(raw.get("verticals"), list) and raw.get("verticals")
-            else raw.get("primaryIndustryCode", "")
+            or (raw["verticals"][0] if isinstance(raw.get("verticals"), list) and raw["verticals"] else "")
         ),
         "employee_count": raw.get("employees") or raw.get("employeeCount"),
         "revenue_range": raw.get("revenueRange") or raw.get("revenue", ""),
