@@ -97,13 +97,13 @@ async def confirm_subverticals(
     else:
         selected = [r.subvertical_name for r in recs if r.user_selected]
 
-    # Update run config with selected subverticals
+    # Persist selected subverticals into run config
     run_repo = RunRepository(session)
     run = await run_repo.get(run_id)
     if run:
         config = run.config.copy()
         config["selected_subverticals"] = selected
-        run.config = config
+        await run_repo.update_config(run_id, config)
         await run_repo.update_stage(run_id, "subvertical_confirmation")
 
     return {"run_id": run_id, "confirmed_subverticals": selected}
@@ -186,7 +186,7 @@ async def confirm_sources(
     if run:
         config = run.config.copy()
         config["selected_sources"] = confirmed
-        run.config = config
+        await run_repo.update_config(run_id, config)
         await run_repo.update_stage(run_id, "source_confirmation")
 
     return {"run_id": run_id, "confirmed_sources_count": len(confirmed)}

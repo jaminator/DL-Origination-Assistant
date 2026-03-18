@@ -45,6 +45,14 @@ class RunRepository:
         )
         await self.session.commit()
 
+    async def update_config(self, run_id: str, config: dict) -> None:
+        await self.session.execute(
+            update(RunRecord)
+            .where(RunRecord.id == run_id)
+            .values(config=config, updated_at=datetime.utcnow())
+        )
+        await self.session.commit()
+
     async def list_runs(self, limit: int = 50) -> list[RunRecord]:
         result = await self.session.execute(select(RunRecord).order_by(RunRecord.created_at.desc()).limit(limit))
         return list(result.scalars().all())
