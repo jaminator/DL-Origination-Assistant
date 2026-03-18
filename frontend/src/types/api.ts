@@ -61,14 +61,14 @@ export interface CreateRunRequest {
 
 export interface SubVertical {
   id: string;
-  subvertical_name: string;
+  subvertical_name?: string;
   description?: string;
   thematic_fit_explanation?: string;
   lender_fit_explanation?: string;
   thematic_fit_score?: number;
   lender_fit_score?: number;
   total_recommendation_score?: number;
-  recommendation_status: RecommendationStatus;
+  recommendation_status?: RecommendationStatus;
   demand_profile?: string;
   cyclicality_profile?: string;
   recurring_revenue_profile?: string;
@@ -79,7 +79,7 @@ export interface SubVertical {
   reasons_to_lend?: string[];
   reasons_not_to_lend?: string[];
   confidence?: number;
-  user_selected: boolean;
+  user_selected?: boolean;
   data?: Record<string, unknown>;
 }
 

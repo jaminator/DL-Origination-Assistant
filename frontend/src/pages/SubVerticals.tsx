@@ -31,7 +31,7 @@ export function SubVerticals() {
       // Pre-select strong_fit and moderate_fit
       const autoSelected = new Set(
         result.recommendations
-          .filter((r) => ['strong_fit', 'moderate_fit'].includes(r.recommendation_status))
+          .filter((r) => ['strong_fit', 'moderate_fit'].includes(r.recommendation_status ?? ''))
           .map((r) => r.id),
       );
       setSelected(autoSelected);
@@ -55,7 +55,7 @@ export function SubVerticals() {
   if (subverticals?.length && selected.size === 0 && !confirmed) {
     const preSelected = new Set(
       subverticals
-        .filter((sv) => sv.user_selected || ['strong_fit', 'moderate_fit'].includes(sv.recommendation_status))
+        .filter((sv) => sv.user_selected || ['strong_fit', 'moderate_fit'].includes(sv.recommendation_status ?? ''))
         .map((sv) => sv.id),
     );
     if (preSelected.size > 0) setSelected(preSelected);
@@ -156,9 +156,9 @@ export function SubVerticals() {
                             {expanded.has(sv.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                           </button>
                         </td>
-                        <td className="px-3 py-3 font-medium text-slate-900">{sv.subvertical_name}</td>
+                        <td className="px-3 py-3 font-medium text-slate-900">{sv.subvertical_name ?? '—'}</td>
                         <td className="px-3 py-3">
-                          <RecommendationBadge status={sv.recommendation_status} />
+                          <RecommendationBadge status={sv.recommendation_status ?? 'watchlist'} />
                         </td>
                         <td className="px-3 py-3 text-right text-slate-600">{sv.thematic_fit_score?.toFixed(0) ?? '—'}</td>
                         <td className="px-3 py-3 text-right text-slate-600">{sv.lender_fit_score?.toFixed(0) ?? '—'}</td>
@@ -179,29 +179,29 @@ export function SubVerticals() {
                                 </div>
                               </div>
                               <div>
-                                {(sv.reasons_to_lend?.length ?? 0) > 0 && (
+                                {(sv.reasons_to_lend ?? []).length > 0 && (
                                   <div className="mb-3">
                                     <h4 className="text-xs font-semibold text-green-700 mb-1">Reasons to Lend</h4>
                                     <ul className="space-y-0.5">
-                                      {sv.reasons_to_lend.map((r, i) => (
+                                      {(sv.reasons_to_lend ?? []).map((r, i) => (
                                         <li key={i} className="text-xs text-green-600">+ {r}</li>
                                       ))}
                                     </ul>
                                   </div>
                                 )}
-                                {(sv.reasons_not_to_lend?.length ?? 0) > 0 && (
+                                {(sv.reasons_not_to_lend ?? []).length > 0 && (
                                   <div>
                                     <h4 className="text-xs font-semibold text-red-700 mb-1">Risks</h4>
                                     <ul className="space-y-0.5">
-                                      {sv.reasons_not_to_lend.map((r, i) => (
+                                      {(sv.reasons_not_to_lend ?? []).map((r, i) => (
                                         <li key={i} className="text-xs text-red-600">- {r}</li>
                                       ))}
                                     </ul>
                                   </div>
                                 )}
-                                {(sv.example_borrower_archetypes?.length ?? 0) > 0 && (
+                                {(sv.example_borrower_archetypes ?? []).length > 0 && (
                                   <div className="mt-3 flex flex-wrap gap-1">
-                                    {sv.example_borrower_archetypes.map((a, i) => (
+                                    {(sv.example_borrower_archetypes ?? []).map((a, i) => (
                                       <span key={i} className="rounded bg-slate-200 px-2 py-0.5 text-xs text-slate-600">{a}</span>
                                     ))}
                                   </div>
