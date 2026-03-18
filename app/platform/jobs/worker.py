@@ -1,6 +1,5 @@
 """ARQ worker setup for background job processing."""
 
-import asyncio
 from typing import ClassVar
 
 from arq.connections import RedisSettings
@@ -127,12 +126,9 @@ class WorkerSettings:
     keep_result = 3600  # 1 hour
 
 
-async def main():
+if __name__ == "__main__":
     setup_logging()
     logger.info("worker_starting")
     from arq import run_worker
+
     run_worker(WorkerSettings)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
