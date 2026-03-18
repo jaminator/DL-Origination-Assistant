@@ -62,23 +62,23 @@ export interface CreateRunRequest {
 export interface SubVertical {
   id: string;
   subvertical_name: string;
-  description: string;
-  thematic_fit_explanation: string;
-  lender_fit_explanation: string;
-  thematic_fit_score: number;
-  lender_fit_score: number;
-  total_recommendation_score: number;
+  description?: string;
+  thematic_fit_explanation?: string;
+  lender_fit_explanation?: string;
+  thematic_fit_score?: number;
+  lender_fit_score?: number;
+  total_recommendation_score?: number;
   recommendation_status: RecommendationStatus;
-  demand_profile: string;
-  cyclicality_profile: string;
-  recurring_revenue_profile: string;
-  margin_profile: string;
-  capital_intensity_profile: string;
-  ownership_landscape: string;
-  example_borrower_archetypes: string[];
-  reasons_to_lend: string[];
-  reasons_not_to_lend: string[];
-  confidence: number;
+  demand_profile?: string;
+  cyclicality_profile?: string;
+  recurring_revenue_profile?: string;
+  margin_profile?: string;
+  capital_intensity_profile?: string;
+  ownership_landscape?: string;
+  example_borrower_archetypes?: string[];
+  reasons_to_lend?: string[];
+  reasons_not_to_lend?: string[];
+  confidence?: number;
   user_selected: boolean;
   data?: Record<string, unknown>;
 }
@@ -90,12 +90,12 @@ export interface SourceRecommendation {
   source_name: string;
   source_type: string;
   url?: string;
-  mapped_subverticals: string[];
-  rationale: string;
-  expected_company_type: string;
-  expected_data_quality: string;
-  access_type: string;
-  recommendation_priority: SourcePriority;
+  mapped_subverticals?: string[];
+  rationale?: string;
+  expected_company_type?: string;
+  expected_data_quality?: string;
+  access_type?: string;
+  recommendation_priority?: SourcePriority;
   user_selected: boolean;
   data?: Record<string, unknown>;
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -138,10 +138,10 @@ export function SubVerticals() {
               </thead>
               <tbody>
                 {subverticals
-                  .sort((a, b) => b.total_recommendation_score - a.total_recommendation_score)
+                  .sort((a, b) => (b.total_recommendation_score ?? 0) - (a.total_recommendation_score ?? 0))
                   .map((sv) => (
-                    <>
-                      <tr key={sv.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <React.Fragment key={sv.id}>
+                      <tr className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="px-3 py-3">
                           <input
                             type="checkbox"
@@ -160,16 +160,16 @@ export function SubVerticals() {
                         <td className="px-3 py-3">
                           <RecommendationBadge status={sv.recommendation_status} />
                         </td>
-                        <td className="px-3 py-3 text-right text-slate-600">{sv.thematic_fit_score.toFixed(0)}</td>
-                        <td className="px-3 py-3 text-right text-slate-600">{sv.lender_fit_score.toFixed(0)}</td>
-                        <td className="px-3 py-3 text-right font-medium">{sv.total_recommendation_score.toFixed(0)}</td>
+                        <td className="px-3 py-3 text-right text-slate-600">{sv.thematic_fit_score?.toFixed(0) ?? '—'}</td>
+                        <td className="px-3 py-3 text-right text-slate-600">{sv.lender_fit_score?.toFixed(0) ?? '—'}</td>
+                        <td className="px-3 py-3 text-right font-medium">{sv.total_recommendation_score?.toFixed(0) ?? '—'}</td>
                       </tr>
                       {expanded.has(sv.id) && (
-                        <tr key={`${sv.id}-detail`} className="bg-slate-50 border-b border-slate-100">
+                        <tr className="bg-slate-50 border-b border-slate-100">
                           <td colSpan={7} className="px-8 py-4">
                             <div className="grid grid-cols-2 gap-6 text-sm">
                               <div>
-                                <p className="text-slate-700 mb-3">{sv.description}</p>
+                                <p className="text-slate-700 mb-3">{sv.description ?? ''}</p>
                                 <div className="space-y-1 text-xs text-slate-500">
                                   {sv.demand_profile && <div>Demand: {sv.demand_profile}</div>}
                                   {sv.cyclicality_profile && <div>Cyclicality: {sv.cyclicality_profile}</div>}
@@ -179,7 +179,7 @@ export function SubVerticals() {
                                 </div>
                               </div>
                               <div>
-                                {sv.reasons_to_lend.length > 0 && (
+                                {(sv.reasons_to_lend?.length ?? 0) > 0 && (
                                   <div className="mb-3">
                                     <h4 className="text-xs font-semibold text-green-700 mb-1">Reasons to Lend</h4>
                                     <ul className="space-y-0.5">
@@ -189,7 +189,7 @@ export function SubVerticals() {
                                     </ul>
                                   </div>
                                 )}
-                                {sv.reasons_not_to_lend.length > 0 && (
+                                {(sv.reasons_not_to_lend?.length ?? 0) > 0 && (
                                   <div>
                                     <h4 className="text-xs font-semibold text-red-700 mb-1">Risks</h4>
                                     <ul className="space-y-0.5">
@@ -199,7 +199,7 @@ export function SubVerticals() {
                                     </ul>
                                   </div>
                                 )}
-                                {sv.example_borrower_archetypes.length > 0 && (
+                                {(sv.example_borrower_archetypes?.length ?? 0) > 0 && (
                                   <div className="mt-3 flex flex-wrap gap-1">
                                     {sv.example_borrower_archetypes.map((a, i) => (
                                       <span key={i} className="rounded bg-slate-200 px-2 py-0.5 text-xs text-slate-600">{a}</span>
@@ -211,7 +211,7 @@ export function SubVerticals() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </React.Fragment>
                   ))}
               </tbody>
             </table>

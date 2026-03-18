@@ -55,20 +55,24 @@ async def recommend_subverticals(run_id: str, session: AsyncSession = Depends(ge
 
 @router.get("/{run_id}/subverticals")
 async def list_subverticals(run_id: str, session: AsyncSession = Depends(get_db)):
-    """List current sub-vertical recommendations."""
+    """List current sub-vertical recommendations with full detail from stored data."""
     repo = RecommendationRepository(session)
     recs = await repo.list_theme_recommendations(run_id)
-    return [
-        {
-            "id": r.id,
-            "subvertical_name": r.subvertical_name,
-            "recommendation_status": r.recommendation_status,
-            "total_score": r.total_recommendation_score,
-            "user_selected": r.user_selected,
-            "data": r.data,
-        }
-        for r in recs
-    ]
+    results = []
+    for r in recs:
+        # Spread the full data dict, then overlay indexed columns
+        entry = dict(r.data) if r.data else {}
+        entry.update(
+            {
+                "id": r.id,
+                "subvertical_name": r.subvertical_name,
+                "recommendation_status": r.recommendation_status,
+                "total_recommendation_score": r.total_recommendation_score,
+                "user_selected": r.user_selected,
+            }
+        )
+        results.append(entry)
+    return results
 
 
 @router.post("/{run_id}/confirm-subverticals")
@@ -140,19 +144,22 @@ async def recommend_sources(run_id: str, session: AsyncSession = Depends(get_db)
 
 @router.get("/{run_id}/sources")
 async def list_sources(run_id: str, session: AsyncSession = Depends(get_db)):
-    """List current source recommendations."""
+    """List current source recommendations with full detail from stored data."""
     repo = RecommendationRepository(session)
     sources = await repo.list_source_recommendations(run_id)
-    return [
-        {
-            "id": s.id,
-            "source_name": s.source_name,
-            "source_type": s.source_type,
-            "user_selected": s.user_selected,
-            "data": s.data,
-        }
-        for s in sources
-    ]
+    results = []
+    for s in sources:
+        entry = dict(s.data) if s.data else {}
+        entry.update(
+            {
+                "id": s.id,
+                "source_name": s.source_name,
+                "source_type": s.source_type,
+                "user_selected": s.user_selected,
+            }
+        )
+        results.append(entry)
+    return results
 
 
 @router.post("/{run_id}/confirm-sources")

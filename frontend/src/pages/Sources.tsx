@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -30,7 +30,7 @@ export function Sources() {
       queryClient.invalidateQueries({ queryKey: ['sources', runId] });
       const autoSelected = new Set(
         result.sources
-          .filter((s) => ['core', 'useful'].includes(s.recommendation_priority))
+          .filter((s) => ['core', 'useful'].includes(s.recommendation_priority ?? ''))
           .map((s) => s.id),
       );
       setSelected(autoSelected);
@@ -53,7 +53,7 @@ export function Sources() {
   if (sources?.length && selected.size === 0 && !confirmed) {
     const preSelected = new Set(
       sources
-        .filter((s) => s.user_selected || ['core', 'useful'].includes(s.recommendation_priority))
+        .filter((s) => s.user_selected || ['core', 'useful'].includes(s.recommendation_priority ?? ''))
         .map((s) => s.id),
     );
     if (preSelected.size > 0) setSelected(preSelected);
@@ -126,8 +126,8 @@ export function Sources() {
             </thead>
             <tbody>
               {sources.map((src) => (
-                <>
-                  <tr key={src.id} className="border-b border-slate-100 hover:bg-slate-50">
+                <React.Fragment key={src.id}>
+                  <tr className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-3 py-3">
                       <input
                         type="checkbox"
@@ -147,12 +147,12 @@ export function Sources() {
                       <Badge variant="outline">{src.source_type?.replace(/_/g, ' ')}</Badge>
                     </td>
                     <td className="px-3 py-3">
-                      <PriorityBadge priority={src.recommendation_priority} />
+                      <PriorityBadge priority={src.recommendation_priority ?? 'optional'} />
                     </td>
                     <td className="px-3 py-3 text-xs text-slate-500">{src.access_type?.replace(/_/g, ' ')}</td>
                   </tr>
                   {expanded.has(src.id) && (
-                    <tr key={`${src.id}-detail`} className="bg-slate-50 border-b border-slate-100">
+                    <tr className="bg-slate-50 border-b border-slate-100">
                       <td colSpan={6} className="px-8 py-4">
                         <div className="text-sm space-y-2">
                           <p className="text-slate-700">{src.rationale}</p>
@@ -177,7 +177,7 @@ export function Sources() {
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               ))}
             </tbody>
           </table>
