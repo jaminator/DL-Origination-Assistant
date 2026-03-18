@@ -349,7 +349,13 @@ def mine_execute(run_id: str = typer.Option(..., help="Run ID")):
             llm = get_llm_service()
             pb = get_pitchbook_adapter()
             storage = get_storage()
-            engine = MinerEngine(llm_service=llm, pitchbook_adapter=pb, storage=storage)
+            from app.platform.api.deps import get_bizapi_adapter, get_capitaliq_adapter
+            engine = MinerEngine(
+                llm_service=llm, pitchbook_adapter=pb,
+                bizapi_adapter=get_bizapi_adapter(),
+                capitaliq_adapter=get_capitaliq_adapter(),
+                storage=storage,
+            )
 
             console.print(f"[yellow]Starting pipeline for run {run_id}...[/yellow]")
             await run_repo.update_status(run_id, "running")
@@ -421,7 +427,13 @@ def mine_rerun_stage(
             llm = get_llm_service()
             pb = get_pitchbook_adapter()
             storage = get_storage()
-            engine = MinerEngine(llm_service=llm, pitchbook_adapter=pb, storage=storage)
+            from app.platform.api.deps import get_bizapi_adapter, get_capitaliq_adapter
+            engine = MinerEngine(
+                llm_service=llm, pitchbook_adapter=pb,
+                bizapi_adapter=get_bizapi_adapter(),
+                capitaliq_adapter=get_capitaliq_adapter(),
+                storage=storage,
+            )
 
             console.print(f"[yellow]Re-running stage {stage} for run {run_id}...[/yellow]")
             result = await engine.rerun_stage(UUID(run_id), run.config, ws)

@@ -40,6 +40,25 @@ async def readiness_check(
     connector_report = await mcp.health_report()
     connectors = {name: {"available": h.available, "message": h.message} for name, h in connector_report.items()}
 
+    # Enrichment provider health
+    from app.platform.api.deps import get_bizapi_adapter, get_capitaliq_adapter
+    try:
+        bizapi = get_bizapi_adapter()
+        bizapi_available = await bizapi.is_available()
+    except Exception:
+        bizapi_available = False
+    try:
+        capitaliq = get_capitaliq_adapter()
+        capitaliq_available = await capitaliq.is_available()
+    except Exception:
+        capitaliq_available = False
+
+    connectors["bizapi"] = {"available": bizapi_available, "message": "ok" if bizapi_available else "not configured"}
+    connectors["capitaliq"] = {
+        "available": capitaliq_available,
+        "message": "ok" if capitaliq_available else "not configured",
+    }
+
     return {
         "status": "ready" if db_status == "ok" else "not_ready",
         "database": db_status,

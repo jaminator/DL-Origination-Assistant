@@ -51,6 +51,27 @@ def export_excel(companies: list[dict]) -> bytes:
                 row.append(val)
             ws_capstruct.append(row)
 
+    # Enrichment Sources sheet
+    ws_enrichment = wb.create_sheet("Enrichment Sources")
+    enrichment_cols = [
+        "canonical_name", "bizapi_status", "bizapi_duns", "bizapi_match_method",
+        "bizapi_match_confidence", "bizapi_verified_name", "naics_code", "naics_description",
+        "sic_code", "bizapi_sales_volume", "bizapi_employee_count",
+        "ciq_status", "ciq_entity_id", "ciq_revenue", "ciq_ebitda",
+        "ciq_total_debt", "ciq_ownership_type",
+        "pb_status", "pb_entity_id",
+        "revenue_source", "ownership_source",
+    ]
+    ws_enrichment.append(enrichment_cols)
+    for company in companies:
+        row = []
+        for col in enrichment_cols:
+            val = company.get(col, "")
+            if isinstance(val, list):
+                val = "; ".join(str(v) for v in val)
+            row.append(val)
+        ws_enrichment.append(row)
+
     output = io.BytesIO()
     wb.save(output)
     return output.getvalue()

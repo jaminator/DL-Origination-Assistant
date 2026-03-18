@@ -7,20 +7,28 @@ from app.ai.llm_service import LLMService
 from app.ai.prompts.web_enrichment import WebEnrichmentPrompt
 from app.miner.dedup import DedupResult, deduplicate_names
 from app.miner.dispositioning import assign_disposition
+from app.miner.enrichment.bizapi.adapter import BizAPIAdapter
+from app.miner.enrichment.capitaliq.adapter import CapitalIQAdapter
 from app.miner.pitchbook.adapter import PitchBookAdapter
 from app.miner.sources.registry import SourceRegistry
 from app.platform.config.defaults import DEFAULT_GEOGRAPHY_FILTER
 from app.platform.exports.service import ExportService
 from app.platform.models.enums import (
+    BizAPIStatus,
+    CapitalIQStatus,
     DataQualityTag,
     Disposition,
     OwnershipTier,
     PitchBookStatus,
+    ReviewReason,
     WorkflowStage,
 )
 from app.platform.models.schemas import CompanyRecord, RawCompany
 from app.platform.persistence.storage import StorageBackend
-from app.platform.review.queue import generate_review_items_from_dedup
+from app.platform.review.queue import (
+    generate_review_items_from_dedup,
+    generate_review_items_from_enrichment_conflict,
+)
 from app.platform.scoring.company_scorer import score_company
 from app.platform.utils.logging import get_logger
 from app.platform.utils.normalization import canonical_form, normalize_company_name
@@ -36,11 +44,15 @@ class MinerEngine:
         self,
         llm_service: LLMService | None = None,
         pitchbook_adapter: PitchBookAdapter | None = None,
+        bizapi_adapter: BizAPIAdapter | None = None,
+        capitaliq_adapter: CapitalIQAdapter | None = None,
         storage: StorageBackend | None = None,
         source_registry: SourceRegistry | None = None,
     ):
         self._llm = llm_service
         self._pitchbook = pitchbook_adapter
+        self._bizapi = bizapi_adapter
+        self._capitaliq = capitaliq_adapter
         self._storage = storage
         self._source_registry = source_registry or SourceRegistry()
         self._enrichment_prompt = WebEnrichmentPrompt()
@@ -60,7 +72,9 @@ class MinerEngine:
             (WorkflowStage.NAME_NORMALIZATION, self._run_name_normalization),
             (WorkflowStage.WEB_ENHANCEMENT, self._run_web_enhancement),
             (WorkflowStage.DISPOSITIONING, self._run_dispositioning),
+            (WorkflowStage.BIZAPI_ENRICHMENT, self._run_bizapi_enrichment),
             (WorkflowStage.PITCHBOOK_ENRICHMENT, self._run_pitchbook_enrichment),
+            (WorkflowStage.CAPITALIQ_ENRICHMENT, self._run_capitaliq_enrichment),
             (WorkflowStage.CASCADE_EXPANSION, self._run_cascade_expansion),
             (WorkflowStage.FINAL_DEDUP, self._run_final_dedup),
             (WorkflowStage.QA_VALIDATION, self._run_qa_validation),
@@ -94,7 +108,9 @@ class MinerEngine:
             WorkflowStage.NAME_NORMALIZATION: self._run_name_normalization,
             WorkflowStage.WEB_ENHANCEMENT: self._run_web_enhancement,
             WorkflowStage.DISPOSITIONING: self._run_dispositioning,
+            WorkflowStage.BIZAPI_ENRICHMENT: self._run_bizapi_enrichment,
             WorkflowStage.PITCHBOOK_ENRICHMENT: self._run_pitchbook_enrichment,
+            WorkflowStage.CAPITALIQ_ENRICHMENT: self._run_capitaliq_enrichment,
             WorkflowStage.CASCADE_EXPANSION: self._run_cascade_expansion,
             WorkflowStage.FINAL_DEDUP: self._run_final_dedup,
             WorkflowStage.QA_VALIDATION: self._run_qa_validation,
@@ -274,6 +290,135 @@ class MinerEngine:
         logger.info("dispositioning_complete", run_id=str(run_id), counts=counts)
         return {"stage": "dispositioning", "status": "completed", "counts": counts}
 
+    async def _run_bizapi_enrichment(self, run_id: UUID, config: dict) -> dict:
+        """Verify and enrich companies via NAICS BizAPI."""
+        if not self._bizapi:
+            logger.warning("bizapi_no_adapter", run_id=str(run_id))
+            return {"stage": "bizapi_enrichment", "status": "skipped", "reason": "no_adapter"}
+
+        if not await self._bizapi.is_available():
+            logger.warning("bizapi_unavailable", run_id=str(run_id))
+            return {"stage": "bizapi_enrichment", "status": "skipped", "reason": "unavailable"}
+
+        eligible = (Disposition.PRIMARY, Disposition.WATCH, Disposition.CASCADE_ANCHOR)
+        targets = [
+            c for c in self._companies
+            if c.disposition in eligible and c.bizapi_status == BizAPIStatus.PENDING
+        ]
+
+        matched = 0
+        not_found = 0
+        errors = 0
+
+        for company in targets:
+            try:
+                result = await self._bizapi.match_company(
+                    company.canonical_name,
+                    duns=company.bizapi_duns,
+                    website=company.website,
+                    state=company.hq_state,
+                )
+
+                if not result:
+                    company.bizapi_status = BizAPIStatus.NOT_FOUND
+                    not_found += 1
+                    company.workflow_stage = WorkflowStage.BIZAPI_ENRICHMENT
+                    continue
+
+                company.bizapi_status = BizAPIStatus.MATCHED
+                company.bizapi_duns = result.get("duns")
+                company.bizapi_match_method = result.get("match_method")
+                company.bizapi_match_confidence = result.get("match_confidence")
+
+                # Store source-specific fields
+                company.naics_code = result.get("naics_code") or company.naics_code
+                company.naics_description = result.get("naics_description") or company.naics_description
+                company.sic_code = result.get("sic_code") or company.sic_code
+                company.sic_description = result.get("sic_description") or company.sic_description
+                company.bizapi_year_started = result.get("year_started")
+                company.bizapi_employee_count = result.get("employee_count")
+                company.bizapi_sales_volume = result.get("sales_volume")
+                company.bizapi_verified_name = result.get("verified_name")
+                company.bizapi_corporate_linkage = result.get("corporate_linkage")
+
+                # Verified address
+                addr = result.get("verified_address", {})
+                if addr:
+                    company.bizapi_verified_address = (
+                        f"{addr.get('street', '')}, {addr.get('city', '')}, "
+                        f"{addr.get('state', '')} {addr.get('zip', '')}".strip(", ")
+                    )
+
+                # Update canonical fields — BizAPI priority: above Web, below PB/CIQ
+                confidence = result.get("match_confidence", 0.0)
+
+                if confidence >= 0.80:
+                    # BizAPI is authoritative for employee count
+                    if result.get("employee_count") and company.employee_count is None:
+                        company.employee_count = result["employee_count"]
+
+                    # BizAPI address upgrades web-enrichment address
+                    if addr.get("city") and (not company.hq_city or company.ownership_source == "llm_web_enrichment"):
+                        company.hq_city = addr["city"]
+                    if addr.get("state") and (not company.hq_state or company.ownership_source == "llm_web_enrichment"):
+                        company.hq_state = addr["state"]
+
+                    # BizAPI sales volume upgrades web estimates
+                    if result.get("sales_volume") and (
+                        company.revenue_source in (None, "llm_web_enrichment")
+                    ):
+                        company.revenue_estimate = result["sales_volume"]
+                        company.revenue_source = "bizapi"
+                        company.revenue_quality = DataQualityTag.CLEAN
+
+                    # Founded year
+                    if result.get("year_started") and not company.founded_year:
+                        company.founded_year = result["year_started"]
+
+                # Weak match → flag for review
+                if 0.50 <= confidence < 0.80:
+                    company.review_required = True
+                    if ReviewReason.WEAK_ENRICHMENT_MATCH not in company.review_reasons:
+                        company.review_reasons.append(ReviewReason.WEAK_ENRICHMENT_MATCH)
+
+                # Corporate linkage → flag subsidiary
+                linkage = result.get("corporate_linkage", {})
+                if linkage.get("parent_duns"):
+                    company.review_required = True
+                    if ReviewReason.ACQUISITION_MERGER not in company.review_reasons:
+                        company.review_reasons.append(ReviewReason.ACQUISITION_MERGER)
+
+                # Track provenance
+                company.ai_provenance["bizapi_enrichment"] = AIProvenance(
+                    ai_generated=False,
+                    connector_source="bizapi",
+                    confidence_score=confidence,
+                    acceptance_status="auto_accepted" if confidence >= 0.80 else "pending",
+                )
+
+                company.workflow_stage = WorkflowStage.BIZAPI_ENRICHMENT
+                matched += 1
+
+            except Exception as e:
+                logger.error("bizapi_enrichment_failed", company=company.canonical_name, error=str(e))
+                company.bizapi_status = BizAPIStatus.ERROR
+                errors += 1
+
+        logger.info(
+            "bizapi_enrichment_complete",
+            run_id=str(run_id),
+            matched=matched,
+            not_found=not_found,
+            errors=errors,
+        )
+        return {
+            "stage": "bizapi_enrichment",
+            "status": "completed",
+            "matched": matched,
+            "not_found": not_found,
+            "errors": errors,
+        }
+
     async def _run_pitchbook_enrichment(self, run_id: UUID, config: dict) -> dict:
         """Enrich via PitchBook adapter (mock or MCP)."""
         if not self._pitchbook:
@@ -344,6 +489,139 @@ class MinerEngine:
 
         logger.info("pitchbook_enrichment_complete", run_id=str(run_id), matched=matched, not_found=not_found)
         return {"stage": "pitchbook_enrichment", "status": "completed", "matched": matched, "not_found": not_found}
+
+    async def _run_capitaliq_enrichment(self, run_id: UUID, config: dict) -> dict:
+        """Enrich companies with S&P Capital IQ private-market data."""
+        if not self._capitaliq:
+            logger.warning("capitaliq_no_adapter", run_id=str(run_id))
+            return {"stage": "capitaliq_enrichment", "status": "skipped", "reason": "no_adapter"}
+
+        if not await self._capitaliq.is_available():
+            logger.warning("capitaliq_unavailable", run_id=str(run_id))
+            return {"stage": "capitaliq_enrichment", "status": "skipped", "reason": "unavailable"}
+
+        skip_if_pb_complete = config.get("capitaliq_skip_if_pb_complete", True)
+        eligible = (Disposition.PRIMARY, Disposition.WATCH, Disposition.CASCADE_ANCHOR)
+        targets = [
+            c for c in self._companies
+            if c.disposition in eligible and c.ciq_status == CapitalIQStatus.PENDING
+        ]
+
+        matched = 0
+        not_found = 0
+        skipped = 0
+        errors = 0
+
+        for company in targets:
+            # Skip if PitchBook already provided complete data
+            if skip_if_pb_complete and _pb_is_complete(company):
+                company.ciq_status = CapitalIQStatus.SKIPPED
+                company.workflow_stage = WorkflowStage.CAPITALIQ_ENRICHMENT
+                skipped += 1
+                continue
+
+            try:
+                search = await self._capitaliq.search_company(
+                    company.canonical_name,
+                    duns=company.bizapi_duns,
+                )
+
+                if not search:
+                    company.ciq_status = CapitalIQStatus.NOT_FOUND
+                    not_found += 1
+                    company.workflow_stage = WorkflowStage.CAPITALIQ_ENRICHMENT
+                    continue
+
+                company.ciq_status = CapitalIQStatus.MATCHED
+                company.ciq_entity_id = search.get("entity_id")
+                matched += 1
+
+                if company.ciq_entity_id:
+                    # Get financials
+                    financials = await self._capitaliq.get_financials(company.ciq_entity_id)
+                    company.ciq_revenue = financials.get("revenue")
+                    company.ciq_ebitda = financials.get("ebitda")
+                    company.ciq_total_debt = financials.get("total_debt")
+                    company.ciq_net_debt = financials.get("net_debt")
+                    company.ciq_credit_metrics = financials.get("credit_metrics")
+
+                    # Get ownership
+                    ownership = await self._capitaliq.get_ownership(company.ciq_entity_id)
+                    company.ciq_ownership_type = ownership.get("ownership_type")
+                    company.ciq_key_investors = ownership.get("key_investors", [])
+                    company.ciq_ma_history = ownership.get("ma_history", [])
+
+                    # CIQ has highest priority for financial canonical fields
+                    if company.ciq_revenue is not None:
+                        # Conflict detection vs existing revenue
+                        _detect_revenue_conflict(company, company.ciq_revenue, "capitaliq", self._review_items, run_id)
+                        company.revenue_estimate = company.ciq_revenue
+                        company.revenue_source = "capitaliq"
+                        company.revenue_quality = DataQualityTag.CLEAN
+
+                    if company.ciq_ebitda is not None:
+                        company.ebitda_estimate = company.ciq_ebitda
+                        company.ebitda_quality = DataQualityTag.CLEAN
+
+                    # CIQ overrides PB for ownership (highest priority)
+                    if company.ciq_ownership_type:
+                        ciq_tier = _map_ownership_to_tier(company.ciq_ownership_type)
+                        if ciq_tier != OwnershipTier.UNKNOWN:
+                            # Conflict detection vs PitchBook ownership
+                            if (
+                                company.ownership_source == "pitchbook"
+                                and company.ownership_tier != ciq_tier
+                            ):
+                                company.review_required = True
+                                if ReviewReason.CONFLICTING_ENRICHMENT not in company.review_reasons:
+                                    company.review_reasons.append(ReviewReason.CONFLICTING_ENRICHMENT)
+                                self._review_items.extend(
+                                    generate_review_items_from_enrichment_conflict(
+                                        run_id=run_id,
+                                        company_id=company.id,
+                                        company_name=company.canonical_name,
+                                        field="ownership_tier",
+                                        source_a="pitchbook",
+                                        value_a=company.ownership_tier,
+                                        source_b="capitaliq",
+                                        value_b=ciq_tier,
+                                    )
+                                )
+                            company.ownership_tier = ciq_tier
+                            company.ownership_source = "capitaliq"
+                            company.ownership_confidence = search.get("match_confidence")
+
+                # Track provenance
+                company.ai_provenance["capitaliq_enrichment"] = AIProvenance(
+                    ai_generated=False,
+                    connector_source="capitaliq",
+                    confidence_score=search.get("match_confidence", 0.0),
+                    acceptance_status="auto_accepted",
+                )
+
+                company.workflow_stage = WorkflowStage.CAPITALIQ_ENRICHMENT
+
+            except Exception as e:
+                logger.error("capitaliq_enrichment_failed", company=company.canonical_name, error=str(e))
+                company.ciq_status = CapitalIQStatus.ERROR
+                errors += 1
+
+        logger.info(
+            "capitaliq_enrichment_complete",
+            run_id=str(run_id),
+            matched=matched,
+            not_found=not_found,
+            skipped=skipped,
+            errors=errors,
+        )
+        return {
+            "stage": "capitaliq_enrichment",
+            "status": "completed",
+            "matched": matched,
+            "not_found": not_found,
+            "skipped": skipped,
+            "errors": errors,
+        }
 
     async def _run_cascade_expansion(self, run_id: UUID, config: dict) -> dict:
         """Recursive competitor discovery from cascade anchors."""
@@ -507,6 +785,45 @@ class MinerEngine:
     def review_items(self) -> list:
         """Access generated review queue items."""
         return self._review_items
+
+
+def _pb_is_complete(company: CompanyRecord) -> bool:
+    """Check if PitchBook already provided complete financial data."""
+    return (
+        company.pb_status == PitchBookStatus.MATCHED
+        and company.revenue_estimate is not None
+        and company.ebitda_estimate is not None
+        and company.ownership_tier != OwnershipTier.UNKNOWN
+    )
+
+
+def _detect_revenue_conflict(
+    company: CompanyRecord,
+    new_revenue: float,
+    new_source: str,
+    review_items: list,
+    run_id: UUID,
+) -> None:
+    """Flag review if new revenue diverges >50% from existing estimate."""
+    if company.revenue_estimate is None or company.revenue_estimate == 0:
+        return
+    ratio = abs(new_revenue - company.revenue_estimate) / company.revenue_estimate
+    if ratio > 0.50:
+        company.review_required = True
+        if ReviewReason.CONFLICTING_ENRICHMENT not in company.review_reasons:
+            company.review_reasons.append(ReviewReason.CONFLICTING_ENRICHMENT)
+        review_items.extend(
+            generate_review_items_from_enrichment_conflict(
+                run_id=run_id,
+                company_id=company.id,
+                company_name=company.canonical_name,
+                field="revenue_estimate",
+                source_a=company.revenue_source or "unknown",
+                value_a=str(company.revenue_estimate),
+                source_b=new_source,
+                value_b=str(new_revenue),
+            )
+        )
 
 
 def _map_ownership_to_tier(ownership_type: str) -> OwnershipTier:

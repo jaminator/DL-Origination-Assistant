@@ -66,6 +66,10 @@ class CompanyRepository:
             eligible_for_outreach=company_data.get("eligible_for_outreach", False),
             workflow_stage=company_data.get("workflow_stage", "name_generation"),
             review_required=company_data.get("review_required", False),
+            bizapi_status=company_data.get("bizapi_status", "pending"),
+            ciq_status=company_data.get("ciq_status", "pending"),
+            bizapi_duns=company_data.get("bizapi_duns"),
+            ciq_entity_id=company_data.get("ciq_entity_id"),
         )
         merged = await self.session.merge(row)
         await self.session.commit()

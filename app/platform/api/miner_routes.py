@@ -115,10 +115,16 @@ async def rerun_stage(run_id: str, stage: str, session: AsyncSession = Depends(g
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
 
+    from app.platform.api.deps import get_bizapi_adapter, get_capitaliq_adapter
     llm = get_llm_service()
     pb = get_pitchbook_adapter()
     storage = get_storage()
-    miner = MinerEngine(llm_service=llm, pitchbook_adapter=pb, storage=storage)
+    miner = MinerEngine(
+        llm_service=llm, pitchbook_adapter=pb,
+        bizapi_adapter=get_bizapi_adapter(),
+        capitaliq_adapter=get_capitaliq_adapter(),
+        storage=storage,
+    )
     orchestrator = WorkflowOrchestrator(run_repo=run_repo, storage=storage)
 
     result = await orchestrator.rerun_stage(UUID(run_id), ws, miner_engine=miner)

@@ -38,7 +38,13 @@ async def run_pipeline_job(ctx: dict, run_id: str) -> dict:
         llm = get_llm_service()
         pb = get_pitchbook_adapter()
 
-        miner = MinerEngine(llm_service=llm, pitchbook_adapter=pb, storage=storage)
+        from app.platform.api.deps import get_bizapi_adapter, get_capitaliq_adapter
+        miner = MinerEngine(
+            llm_service=llm, pitchbook_adapter=pb,
+            bizapi_adapter=get_bizapi_adapter(),
+            capitaliq_adapter=get_capitaliq_adapter(),
+            storage=storage,
+        )
         orchestrator = WorkflowOrchestrator(
             run_repo=run_repo,
             checkpoint_repo=checkpoint_repo,
@@ -81,7 +87,13 @@ async def resume_pipeline_job(ctx: dict, run_id: str) -> dict:
         llm = get_llm_service()
         pb = get_pitchbook_adapter()
 
-        miner = MinerEngine(llm_service=llm, pitchbook_adapter=pb, storage=storage)
+        from app.platform.api.deps import get_bizapi_adapter, get_capitaliq_adapter
+        miner = MinerEngine(
+            llm_service=llm, pitchbook_adapter=pb,
+            bizapi_adapter=get_bizapi_adapter(),
+            capitaliq_adapter=get_capitaliq_adapter(),
+            storage=storage,
+        )
         orchestrator = WorkflowOrchestrator(
             run_repo=run_repo,
             checkpoint_repo=checkpoint_repo,

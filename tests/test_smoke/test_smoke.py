@@ -50,7 +50,7 @@ class TestImports:
             Disposition,
             WorkflowStage,
         )
-        assert len(WorkflowStage) == 16
+        assert len(WorkflowStage) == 18
         assert len(Disposition) == 4
 
 

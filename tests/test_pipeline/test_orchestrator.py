@@ -89,7 +89,7 @@ async def test_orchestrator_run_pipeline(
 
     # Pipeline should have completed
     assert result is not None
-    assert len(result) == 10
+    assert len(result) == 12
 
     # Run status should have been updated
     mock_run_repo.update_status.assert_called()
@@ -228,7 +228,7 @@ async def test_orchestrator_resume_no_checkpoint_runs_full(
     result = await orchestrator.resume_pipeline(run_id, miner_engine=miner)
 
     # Should run all 10 stages
-    assert len(result) == 10
+    assert len(result) == 12
     assert "name_generation" in result
     assert "export" in result
 

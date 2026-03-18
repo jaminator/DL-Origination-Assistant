@@ -1,0 +1,17 @@
+{
+  "MatchFound": true,
+  "DUNS": "08-146-3297",
+  "CompanyName": "Acme Solutions Inc",
+  "City": "Dallas",
+  "State": "TX",
+  "Country": "US",
+  "NAICSCode": "541512",
+  "NAICSDescription": "Computer Systems Design Services",
+  "SICCode": "7372",
+  "SICDescription": "Prepackaged Software",
+  "YearStarted": 2008,
+  "EmployeesTotal": 320,
+  "SalesVolume": 75000000,
+  "URL": "https://www.acmesolutions.com",
+  "MatchScore": 92
+}

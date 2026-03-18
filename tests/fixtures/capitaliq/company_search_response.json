@@ -1,0 +1,13 @@
+{
+  "Results": [
+    {
+      "CompanyId": "ciq-12345678",
+      "CompanyName": "Acme Solutions Inc",
+      "PrimaryIndustry": "Application Software",
+      "City": "Dallas",
+      "State": "TX",
+      "Country": "US",
+      "MatchScore": 88
+    }
+  ]
+}

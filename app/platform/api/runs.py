@@ -90,7 +90,13 @@ async def execute_run(run_id: str, session: AsyncSession = Depends(get_db)):
     llm = get_llm_service()
     pb = get_pitchbook_adapter()
     storage = get_storage()
-    miner = MinerEngine(llm_service=llm, pitchbook_adapter=pb, storage=storage)
+    from app.platform.api.deps import get_bizapi_adapter, get_capitaliq_adapter
+    miner = MinerEngine(
+        llm_service=llm, pitchbook_adapter=pb,
+        bizapi_adapter=get_bizapi_adapter(),
+        capitaliq_adapter=get_capitaliq_adapter(),
+        storage=storage,
+    )
     orchestrator = WorkflowOrchestrator(
         run_repo=repo,
         checkpoint_repo=CheckpointRepository(session),
@@ -128,7 +134,13 @@ async def resume_run(run_id: str, session: AsyncSession = Depends(get_db)):
     llm = get_llm_service()
     pb = get_pitchbook_adapter()
     storage = get_storage()
-    miner = MinerEngine(llm_service=llm, pitchbook_adapter=pb, storage=storage)
+    from app.platform.api.deps import get_bizapi_adapter, get_capitaliq_adapter
+    miner = MinerEngine(
+        llm_service=llm, pitchbook_adapter=pb,
+        bizapi_adapter=get_bizapi_adapter(),
+        capitaliq_adapter=get_capitaliq_adapter(),
+        storage=storage,
+    )
     orchestrator = WorkflowOrchestrator(
         run_repo=repo,
         checkpoint_repo=CheckpointRepository(session),

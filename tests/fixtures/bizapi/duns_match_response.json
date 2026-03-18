@@ -1,0 +1,23 @@
+{
+  "MatchFound": true,
+  "DUNS": "08-146-3297",
+  "CompanyName": "Acme Solutions Inc",
+  "Street": "100 Commerce Blvd",
+  "City": "Dallas",
+  "State": "TX",
+  "Zip": "75201",
+  "Country": "US",
+  "NAICSCode": "541512",
+  "NAICSDescription": "Computer Systems Design Services",
+  "SICCode": "7372",
+  "SICDescription": "Prepackaged Software",
+  "YearStarted": 2008,
+  "EmployeesHere": 250,
+  "EmployeesTotal": 320,
+  "SalesVolume": 75000000,
+  "URL": "https://www.acmesolutions.com",
+  "ParentDUNS": null,
+  "ParentCompanyName": null,
+  "SubsidiaryCount": 0,
+  "MatchScore": 98
+}

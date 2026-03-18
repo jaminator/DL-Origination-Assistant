@@ -53,6 +53,22 @@ class PitchBookStatus(StrEnum):
     ERROR = "error"
 
 
+class BizAPIStatus(StrEnum):
+    PENDING = "pending"
+    MATCHED = "matched"
+    NOT_FOUND = "not_found"
+    SKIPPED = "skipped"
+    ERROR = "error"
+
+
+class CapitalIQStatus(StrEnum):
+    PENDING = "pending"
+    MATCHED = "matched"
+    NOT_FOUND = "not_found"
+    SKIPPED = "skipped"
+    ERROR = "error"
+
+
 class WorkflowStage(StrEnum):
     THEME_INTAKE = "theme_intake"
     SUBVERTICAL_RECOMMENDATION = "subvertical_recommendation"
@@ -64,6 +80,8 @@ class WorkflowStage(StrEnum):
     WEB_ENHANCEMENT = "web_enhancement"
     DISPOSITIONING = "dispositioning"
     PITCHBOOK_ENRICHMENT = "pitchbook_enrichment"
+    BIZAPI_ENRICHMENT = "bizapi_enrichment"
+    CAPITALIQ_ENRICHMENT = "capitaliq_enrichment"
     CASCADE_EXPANSION = "cascade_expansion"
     FINAL_DEDUP = "final_dedup"
     QA_VALIDATION = "qa_validation"
@@ -81,6 +99,8 @@ class ReviewReason(StrEnum):
     CONFLICTING_SIZE = "conflicting_size"
     LOW_CONFIDENCE_SUBVERTICAL = "low_confidence_subvertical"
     SOURCE_ACCESS_LIMITED = "source_access_limited"
+    WEAK_ENRICHMENT_MATCH = "weak_enrichment_match"
+    CONFLICTING_ENRICHMENT = "conflicting_enrichment"
 
 
 class RunStatus(StrEnum):

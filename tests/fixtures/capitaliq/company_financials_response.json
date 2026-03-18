@@ -1,0 +1,12 @@
+{
+  "CompanyId": "ciq-12345678",
+  "TotalRevenue": 80.0,
+  "EBITDA": 16.0,
+  "TotalDebt": 45.0,
+  "NetDebt": 38.0,
+  "CreditMetrics": {
+    "TotalLeverage": 2.8,
+    "NetLeverage": 2.4,
+    "InterestCoverage": 4.5
+  }
+}

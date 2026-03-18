@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 
 from app.ai.confidence import AIProvenance
 from app.platform.models.enums import (
+    BizAPIStatus,
+    CapitalIQStatus,
     DataQualityTag,
     Disposition,
     OwnershipTier,
@@ -131,6 +133,34 @@ class CompanyRecord(BaseModel):
     close_date: date | None = None
     maturity_date: date | None = None
     catalyst_flags: list[str] = Field(default_factory=list)
+
+    # BizAPI enrichment
+    bizapi_status: BizAPIStatus = BizAPIStatus.PENDING
+    bizapi_duns: str | None = None
+    bizapi_match_method: str | None = None
+    bizapi_match_confidence: float | None = None
+    naics_code: str | None = None
+    naics_description: str | None = None
+    sic_code: str | None = None
+    sic_description: str | None = None
+    bizapi_year_started: int | None = None
+    bizapi_employee_count: int | None = None
+    bizapi_sales_volume: float | None = None  # in millions
+    bizapi_verified_name: str | None = None
+    bizapi_verified_address: str | None = None
+    bizapi_corporate_linkage: dict | None = None
+
+    # Capital IQ enrichment
+    ciq_status: CapitalIQStatus = CapitalIQStatus.PENDING
+    ciq_entity_id: str | None = None
+    ciq_revenue: float | None = None  # in millions
+    ciq_ebitda: float | None = None  # in millions
+    ciq_total_debt: float | None = None  # in millions
+    ciq_net_debt: float | None = None  # in millions
+    ciq_ownership_type: str | None = None
+    ciq_key_investors: list[str] = Field(default_factory=list)
+    ciq_ma_history: list[dict] = Field(default_factory=list)
+    ciq_credit_metrics: dict | None = None
 
     # Scoring
     total_score: float | None = None

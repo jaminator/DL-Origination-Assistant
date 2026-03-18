@@ -60,11 +60,11 @@ def miner(mock_storage, mock_registry):
 
 @pytest.mark.asyncio
 async def test_full_pipeline(miner, run_id, run_config):
-    """Run the full 10-stage pipeline with all mock adapters."""
+    """Run the full 12-stage pipeline with all mock adapters."""
     results = await miner.execute_pipeline(run_id, run_config)
 
-    # All 10 stages should have completed
-    assert len(results) == 10
+    # All 12 stages should have completed
+    assert len(results) == 12
     for stage_result in results.values():
         assert stage_result["status"] in ("completed", "skipped")
 

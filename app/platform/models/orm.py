@@ -50,6 +50,10 @@ class CompanyRow(Base):
     eligible_for_outreach: Mapped[bool] = mapped_column(Boolean, default=False)
     workflow_stage: Mapped[str] = mapped_column(String(50), default="name_generation")
     review_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    bizapi_status: Mapped[str] = mapped_column(String(20), default="pending")
+    ciq_status: Mapped[str] = mapped_column(String(20), default="pending")
+    bizapi_duns: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    ciq_entity_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
