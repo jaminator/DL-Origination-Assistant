@@ -194,8 +194,23 @@ Review items are generated automatically from:
 
 1. **Dedup** — ambiguous matches (score 80-94)
 2. **QA validation** — any check failure on a primary company
+3. **BizAPI enrichment** — weak match confidence (< 0.80), corporate linkage revealing subsidiary relationships
+4. **Cross-source conflict** — revenue/ownership data differs >50% between enrichment providers (BizAPI, PitchBook, Capital IQ)
 
 Each item has:
-- `reason` — enum: `ambiguous_duplicate`, `unknown_ownership`, `boundary_size`, etc.
+- `reason` — enum: `ambiguous_duplicate`, `unknown_ownership`, `boundary_size`, `weak_enrichment_match`, `conflicting_enrichment`, etc.
 - `details` — human-readable description
 - `resolution` — set by analyst: `merge`, `keep_both`, `exclude`, `accept`
+
+### Enrichment Source Priority
+
+When multiple enrichment providers return overlapping fields, the highest-priority source wins:
+
+| Priority | Source | Authority |
+|----------|--------|-----------|
+| 1 (highest) | Capital IQ | Audited financial data |
+| 2 | PitchBook | Curated deal data |
+| 3 | BizAPI | Verified firmographic data |
+| 4 (lowest) | Web enrichment / LLM | Estimates |
+
+Canonical fields (`revenue_estimate`, `ownership_tier`, etc.) always reflect the highest-priority source. Source-specific fields (`bizapi_sales_volume`, `ciq_revenue`, etc.) preserve each provider's raw value.

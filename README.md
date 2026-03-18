@@ -2,13 +2,15 @@
 
 A production-grade platform for automating direct-lending origination target mining. Accepts investment themes, recommends lender-friendly sub-verticals, discovers and enriches borrower candidates, and exports scored outreach lists.
 
-**237 tests passing** | Python 3.11+ | FastAPI + SQLAlchemy 2.0 async | Mock-first local dev
+**303 tests passing** | Python 3.11+ | FastAPI + SQLAlchemy 2.0 async | Mock-first local dev
 
 ## Documentation
 
 - [Architecture Guide](docs/architecture.md) — Module layout, data flow, pipeline stages, design decisions
 - [Scoring and Dispositioning](docs/scoring-and-dispositioning.md) — Scoring formula, disposition rules, QA gates, dedup thresholds
 - [Operations Guide](docs/operations.md) — Setup, deployment, configuration, extending the platform
+- [PitchBook Integration Contract](docs/pitchbook_mcp_contract.md) — PitchBook REST/MCP API reference, tool schemas, data flow
+- [PitchBook MCP Discovery](docs/pitchbook_mcp_discovery.md) — MCP server discovery report and setup instructions
 
 ## Architecture
 
@@ -34,7 +36,7 @@ A production-grade platform for automating direct-lending origination target min
 
 **Three engines:**
 - **Recommender Engine** — Theme → sub-vertical ranking → source recommendations
-- **Miner Engine** — Source extraction → enrichment → dedup → scoring → export
+- **Miner Engine** — Source extraction → multi-source enrichment (BizAPI, PitchBook, Capital IQ) → dedup → scoring → export
 - **AI/MCP Layer** — LLM service abstraction, MCP connectors, prompt library, confidence tracking
 
 ## Quick Start (Local Development)
@@ -123,7 +125,9 @@ curl -X POST http://localhost:8000/api/v1/runs/{run_id}/execute
 |---|---|---|
 | `LLM_PROVIDER` | `mock` | `mock` or `claude` |
 | `LLM_API_KEY` | (empty) | Anthropic API key (when `claude`) |
-| `PITCHBOOK_PROVIDER` | `mock` | `mock` or `mcp` |
+| `PITCHBOOK_PROVIDER` | `mock` | `mock`, `rest`, or `mcp` |
+| `BIZAPI_PROVIDER` | `mock` | `mock` or `rest` (NAICS BizAPI) |
+| `CAPITALIQ_PROVIDER` | `mock` | `mock` or `rest` (S&P Capital IQ) |
 | `DATABASE_URL` | (Docker default) | PostgreSQL connection string |
 | `AUTH_ENABLED` | `false` | Enable auth boundary |
 
@@ -140,29 +144,33 @@ curl -X POST http://localhost:8000/api/v1/runs/{run_id}/execute
 4. **Source Recommendation** — AI generates sources + NAICS codes per sub-vertical
 5. **User Confirmation** — Accept/deselect/add sources
 
-### Phase 3: Mining (background pipeline)
+### Phase 3: Mining (background pipeline, 12 stages)
 6. **Name Generation** — Extract companies from confirmed sources
 7. **Name Normalization** — Standardize names, fuzzy dedup
 8. **Web Enhancement** — AI-assisted enrichment (description, size, geography)
 9. **Dispositioning** — Primary / Cascade Anchor / Exclude / Watch
-10. **PitchBook Enrichment** — Ownership, debt, competitors via MCP
-11. **Cascade Expansion** — Recursive competitor discovery from anchors
-12. **Final Dedup** — Cross-source deduplication
-13. **QA Validation** — Outreach eligibility gates
-14. **Scoring** — Weighted borrower scoring with ownership bonuses
-15. **Export** — CSV, JSON, Excel outputs
+10. **BizAPI Enrichment** — Company verification, DUNS, NAICS/SIC codes, firmographics
+11. **PitchBook Enrichment** — Ownership, debt, competitors via REST/MCP
+12. **Capital IQ Enrichment** — Private-market financials, credit metrics, M&A history
+13. **Cascade Expansion** — Recursive competitor discovery from anchors
+14. **Final Dedup** — Cross-source deduplication
+15. **QA Validation** — Outreach eligibility gates
+16. **Scoring** — Weighted borrower scoring with ownership bonuses
+17. **Export** — CSV, JSON, multi-sheet Excel outputs
 
 ### Phase 4: Review
-- Review queue for ambiguous duplicates, unknown ownership, boundary cases
+- Review queue for ambiguous duplicates, unknown ownership, boundary cases, weak enrichment matches, conflicting enrichment data
 - Export downloads
 
 ## API Reference
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/api/v1/health` | GET | Health check |
+| `/api/v1/health` | GET | Liveness probe (DB connectivity) |
+| `/api/v1/readiness` | GET | Readiness probe (DB + all connectors) |
 | `/api/v1/runs` | POST | Create new run |
 | `/api/v1/runs/{id}` | GET | Get run details |
+| `/api/v1/runs/{id}/status` | GET | Get run status |
 | `/api/v1/runs/{id}/recommend-subverticals` | POST | Generate recommendations |
 | `/api/v1/runs/{id}/confirm-subverticals` | POST | Lock selections |
 | `/api/v1/runs/{id}/recommend-sources` | POST | Generate source recommendations |
@@ -171,9 +179,15 @@ curl -X POST http://localhost:8000/api/v1/runs/{run_id}/execute
 | `/api/v1/runs/{id}/resume` | POST | Resume from checkpoint |
 | `/api/v1/runs/{id}/stages/{stage}/rerun` | POST | Re-run single stage |
 | `/api/v1/runs/{id}/companies` | GET | List companies |
+| `/api/v1/runs/{id}/companies/{company_id}` | GET | Get single company detail |
 | `/api/v1/runs/{id}/review-queue` | GET | List review items |
+| `/api/v1/runs/{id}/review-queue/{item_id}/resolve` | POST | Resolve a review item |
 | `/api/v1/runs/{id}/exports` | POST | Trigger export |
-| `/api/v1/connectors/status` | GET | Connector health |
+| `/api/v1/runs/{id}/exports` | GET | List exports |
+| `/api/v1/runs/{id}/exports/{export_id}/download` | GET | Download export file |
+| `/api/v1/runs/{id}/checkpoints` | GET | List pipeline checkpoints |
+| `/api/v1/runs/{id}/checkpoints/{checkpoint_id}` | GET | Inspect checkpoint detail |
+| `/api/v1/connectors/status` | GET | Connector health report |
 
 ## Extending
 
@@ -185,9 +199,19 @@ Create `profiles/your_industry.yaml` following the structure in `data_center.yam
 2. Register it in `app.miner.sources.registry.SourceRegistry`
 
 ### Swap PitchBook adapter
-1. Set `PITCHBOOK_PROVIDER=mcp` in `.env`
-2. Set `MCP_PITCHBOOK_URL` and `MCP_PITCHBOOK_TOKEN`
-3. Implement the MCP calls in `app/miner/pitchbook/mcp_client.py`
+1. Set `PITCHBOOK_PROVIDER=rest` (or `mcp`) in `.env`
+2. For REST: set `PITCHBOOK_API_KEY`
+3. For MCP: set `MCP_PITCHBOOK_URL` and `MCP_PITCHBOOK_TOKEN`
+
+### Enable BizAPI enrichment
+1. Set `BIZAPI_PROVIDER=rest` in `.env`
+2. Set `BIZAPI_USERNAME` and `BIZAPI_PASSWORD`
+3. Optionally set `BIZAPI_USE_SANDBOX=true` for testing
+
+### Enable Capital IQ enrichment
+1. Set `CAPITALIQ_PROVIDER=rest` in `.env`
+2. Set `CAPITALIQ_API_URL` and `CAPITALIQ_API_KEY`
+3. Set `CAPITALIQ_SKIP_IF_PB_COMPLETE=true` to skip when PitchBook data is complete
 
 ### Deploy to private cloud
 Same Docker images. Change:
@@ -212,7 +236,7 @@ cp .env.example .env
 ### Running Tests
 
 ```bash
-# All tests (no external services needed)
+# All 303 tests (no external services needed)
 pytest tests/ -v
 
 # By category
@@ -220,6 +244,10 @@ pytest tests/test_smoke/              # Import, config, schema smoke tests
 pytest tests/test_integration/        # DB, LLM service, API flow integration
 pytest tests/test_pipeline/           # Full miner pipeline
 pytest tests/test_workflow/           # Dedup, dispositioning, review queue
+pytest tests/test_enrichment/         # Size estimator, exposure, BizAPI, Capital IQ
+pytest tests/test_pitchbook/          # PitchBook REST client tests
+pytest tests/test_scoring/            # Company scorer tests
+pytest tests/test_validation/         # QA gate checks
 
 # With coverage
 pytest tests/ --cov=app --cov-report=term-missing

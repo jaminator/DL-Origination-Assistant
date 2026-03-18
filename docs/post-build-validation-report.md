@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-09
 **Scope:** Full codebase audit, hardening, and gap analysis — updated after Phase 5 closeout
-**Phases completed:** 1 (Scaffold), 2 (Engines), 3 (Wire Up), 4 (Docs), 5 (DB + Claude API)
+**Phases completed:** 1 (Scaffold), 2 (Engines), 3 (Wire Up), 4 (Docs), 5 (DB + Claude API), 6 (Connectors), 6.5 (BizAPI + Capital IQ)
 
 ---
 
@@ -14,19 +14,21 @@ The DL Origination Assistant is a **functional platform** with a complete mock-f
 
 | Metric | Value |
 |---|---|
-| Total tests | 200 passing, 1 skipped (env issue) |
-| Test categories | 14 (integration/db, integration/llm, integration/api-flow, smoke, pipeline, recommendation, enrichment, sources, scoring, validation, workflow, API, utils, dedup) |
+| Total tests | 303 passing |
+| Test categories | 16 (integration/db, integration/llm, integration/api-flow, smoke, pipeline, recommendation, enrichment, enrichment/bizapi, enrichment/capitaliq, pitchbook, sources, scoring, validation, workflow, API, utils) |
 | Ruff lint violations | 0 (clean) |
 | Python version | 3.11+ |
-| Core modules | 50+ files across 4 packages |
+| Core modules | 60+ files across 4 packages |
+| Pipeline stages | 12 (including BizAPI and Capital IQ enrichment) |
+| Enrichment providers | 4 (Web/LLM, BizAPI, PitchBook, Capital IQ) |
 | Real Claude API | Validated (complete + complete_json) |
 | Alembic migration | Initial schema (8 tables) generated and tested |
 | DB persistence | All 6 repositories tested against real SQL |
 
 ### What Works Today
 
-1. **Full pipeline execution** with mock providers — theme → sub-verticals → sources → mine → enrich → score → export
-2. **All 10 miner stages** execute in sequence with checkpoint/resume support
+1. **Full pipeline execution** with mock providers — theme → sub-verticals → sources → mine → enrich (BizAPI + PitchBook + Capital IQ) → score → export
+2. **All 12 miner stages** execute in sequence with checkpoint/resume support
 3. **Recommender engine** produces structured sub-vertical and source recommendations via LLM prompts
 4. **Real Claude API integration** — `ClaudeLLMService` with retry/backoff, auth validation, rate limit handling, structured response parsing
 5. **Database persistence** — All 6 repositories (Run, Company, Checkpoint, Recommendation, Review, Export) tested against real SQL
@@ -35,12 +37,15 @@ The DL Origination Assistant is a **functional platform** with a complete mock-f
 8. **Fuzzy deduplication** with configurable merge/review thresholds
 9. **Dispositioning rules** correctly classify companies as primary/cascade/exclude/watch
 10. **QA validation** with 6 gate checks routing failures to review queue
-11. **Multi-format export** (CSV, JSONL, multi-sheet Excel with outreach and capital structure tabs)
-12. **REST API** with 15+ endpoints including health, runs, recommendations, mining, exports, connectors
-13. **API happy-path integration test** — create run → recommend → confirm (SQLite-backed, real endpoints)
-14. **CLI** with full command set (requires DB for most operations)
-15. **Docker Compose** stack with 4 services
-16. **Portable ORM** — GUID TypeDecorator works on both PostgreSQL (native UUID) and SQLite (String)
+11. **BizAPI enrichment** — Company verification, DUNS, NAICS/SIC codes, firmographics, corporate linkage, with match method cascade and conflict detection
+12. **Capital IQ enrichment** — Private-market financials, credit metrics, M&A history, ownership data, with PB-complete skip logic
+13. **Cross-source conflict detection** — Revenue/ownership conflicts across BizAPI, PitchBook, Capital IQ route to review queue
+14. **Multi-format export** (CSV, JSONL, multi-sheet Excel with outreach, capital structure, and enrichment sources tabs)
+15. **REST API** with 20+ endpoints including health, readiness, runs, recommendations, mining, review resolution, exports, checkpoints, connectors
+16. **API happy-path integration test** — create run → recommend → confirm (SQLite-backed, real endpoints)
+17. **CLI** with full command set (requires DB for most operations)
+18. **Docker Compose** stack with 4 services
+19. **Portable ORM** — GUID TypeDecorator works on both PostgreSQL (native UUID) and SQLite (String)
 
 ### What Doesn't Work Yet
 
@@ -219,7 +224,7 @@ All documents delivered and updated with Phase 5 status.
 | Resume from checkpoint | PASS — Skips completed stages, runs remaining |
 | Resume without checkpoint | PASS — Runs full 10-stage pipeline |
 | Request/response logging | PASS — All connectors log start, complete, and errors |
-| Full test suite | PASS — 237/237 pass, 1 skip (env) |
+| Full test suite | PASS — 303/303 pass |
 
 ### Changes Made
 
@@ -240,3 +245,64 @@ All documents delivered and updated with Phase 5 status.
 
 1. **PitchBook API key** — REST client is fully implemented; just needs a key to test against real API
 2. **PostgreSQL validation** — Docker Compose ready; user needs to run `docker compose up db` and `alembic upgrade head` on their Windows machine
+
+---
+
+## 7. Phase 6.5 — BizAPI + Capital IQ Enrichment Integration
+
+### Summary
+
+Added two new enrichment providers to the pipeline — NAICS BizAPI (company verification and firmographics) and S&P Capital IQ (private-market financials). The pipeline expanded from 10 to 12 stages. Both providers follow the same mock-first architecture as PitchBook.
+
+### What Was Added
+
+**New modules:**
+- `app/miner/enrichment/bizapi/` — BizAPIAdapter ABC, REST client (Basic Auth, 3 req/s rate limit, retry/backoff), mock client, normalizers
+- `app/miner/enrichment/capitaliq/` — CapitalIQAdapter ABC, REST client (API key auth, retry/backoff), mock client, normalizers
+
+**New pipeline stages:**
+- Stage 5: `BIZAPI_ENRICHMENT` — After dispositioning, before PitchBook. Verifies company identity, provides DUNS, NAICS/SIC codes, verified address, employee count, sales volume, corporate linkage
+- Stage 7: `CAPITALIQ_ENRICHMENT` — After PitchBook, before cascade expansion. Provides revenue, EBITDA, debt, credit metrics, ownership, M&A history. Skips companies where PitchBook already provided complete data
+
+**New data model fields:**
+- 14 BizAPI fields on CompanyRecord (duns, match method/confidence, NAICS/SIC, year started, employee count, sales volume, verified name/address, corporate linkage)
+- 10 Capital IQ fields on CompanyRecord (entity ID, revenue, EBITDA, total/net debt, ownership type, investors, M&A history, credit metrics)
+- 2 new status enums: `BizAPIStatus`, `CapitalIQStatus`
+- 2 new review reasons: `WEAK_ENRICHMENT_MATCH`, `CONFLICTING_ENRICHMENT`
+
+**Cross-source conflict detection:**
+- Revenue conflict: flags review when new revenue diverges >50% from existing estimate
+- Ownership conflict: flags review when Capital IQ and PitchBook disagree on ownership tier
+- Source priority hierarchy: CIQ > PB > BizAPI > Web for canonical field updates
+
+**Export updates:**
+- CSV includes BizAPI and Capital IQ columns
+- Excel adds "Enrichment Sources" sheet (4 sheets total)
+
+**Health checks:**
+- `/readiness` endpoint reports BizAPI and Capital IQ availability
+
+**Tests added (66 new, 237 → 303):**
+- BizAPI: REST client, mock client, normalizers, match method selection
+- Capital IQ: REST client, mock client, normalizers
+- Pipeline integration tests for new enrichment stages
+- Conflict detection and review queue generation tests
+
+### Settings Added
+
+| Variable | Default | Description |
+|---|---|---|
+| `BIZAPI_PROVIDER` | `mock` | `mock` or `rest` |
+| `BIZAPI_USERNAME` | (empty) | Basic Auth username |
+| `BIZAPI_PASSWORD` | (empty) | Basic Auth password |
+| `BIZAPI_USE_SANDBOX` | `true` | Use sandbox endpoint |
+| `CAPITALIQ_PROVIDER` | `mock` | `mock` or `rest` |
+| `CAPITALIQ_API_URL` | (empty) | API base URL |
+| `CAPITALIQ_API_KEY` | (empty) | API key |
+| `CAPITALIQ_SKIP_IF_PB_COMPLETE` | `true` | Skip when PB data is complete |
+
+### Remaining Blockers
+
+1. **BizAPI credentials** — REST client is fully implemented; needs sandbox credentials to test against real API
+2. **Capital IQ API documentation** — REST client structure based on expected API; exact endpoints/schemas need confirmation from CIQ docs
+3. **PitchBook API key** — Still needed from Phase 6

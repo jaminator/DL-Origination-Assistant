@@ -77,7 +77,7 @@ pytest tests/ --cov=app --cov-report=term-missing
 pytest tests/test_pipeline/ -v
 ```
 
-All 200 tests run with mock providers — no external services required.
+All 303 tests run with mock providers — no external services required.
 
 ### Test Categories
 
@@ -87,7 +87,8 @@ All 200 tests run with mock providers — no external services required.
 | Integration | `tests/test_integration/` | Real SQL (SQLite), ClaudeLLMService, API workflow |
 | Pipeline | `tests/test_pipeline/` | Full miner pipeline with mocks |
 | Recommendation | `tests/test_recommendation/` | Recommender engine |
-| Enrichment | `tests/test_enrichment/` | Size estimator, exposure classifier |
+| Enrichment | `tests/test_enrichment/` | Size estimator, exposure classifier, BizAPI, Capital IQ |
+| PitchBook | `tests/test_pitchbook/` | PitchBook REST client |
 | Sources | `tests/test_sources/` | NAICS, mock, web scraper adapters |
 | Scoring | `tests/test_scoring/` | Company scorer formula |
 | Validation | `tests/test_validation/` | QA gate checks |
@@ -148,13 +149,40 @@ All settings are loaded from `.env` via Pydantic Settings.
 | `LLM_RATE_LIMIT_RPM` | `50` | Requests per minute limit |
 | `AI_CONFIDENCE_AUTO_ACCEPT_THRESHOLD` | `0.85` | Auto-accept AI outputs above this confidence |
 
-### PitchBook MCP
+### PitchBook
 
 | Variable | Default | Description |
 |---|---|---|
-| `PITCHBOOK_PROVIDER` | `mock` | `mock` for local dev, `mcp` for production |
-| `MCP_PITCHBOOK_URL` | (empty) | MCP server URL |
-| `MCP_PITCHBOOK_TOKEN` | (empty) | MCP authentication token |
+| `PITCHBOOK_PROVIDER` | `mock` | `mock` for local dev, `rest` or `mcp` for production |
+| `PITCHBOOK_API_BASE_URL` | `https://api.pitchbook.com/v2` | PitchBook REST API base URL |
+| `PITCHBOOK_API_KEY` | (empty) | PitchBook API key (when `rest`) |
+| `PITCHBOOK_API_TIMEOUT` | `30.0` | Per-request timeout in seconds |
+| `PITCHBOOK_API_MAX_RETRIES` | `3` | Max retry attempts |
+| `MCP_PITCHBOOK_URL` | (empty) | MCP server URL (when `mcp`) |
+| `MCP_PITCHBOOK_TOKEN` | (empty) | MCP authentication token (when `mcp`) |
+
+### NAICS BizAPI
+
+| Variable | Default | Description |
+|---|---|---|
+| `BIZAPI_PROVIDER` | `mock` | `mock` for local dev, `rest` for production |
+| `BIZAPI_USERNAME` | (empty) | BizAPI Basic Auth username |
+| `BIZAPI_PASSWORD` | (empty) | BizAPI Basic Auth password |
+| `BIZAPI_USE_SANDBOX` | `true` | Use sandbox endpoint for testing |
+| `BIZAPI_TIMEOUT` | `15.0` | Per-request timeout in seconds |
+| `BIZAPI_MAX_RETRIES` | `3` | Max retry attempts |
+| `BIZAPI_RATE_LIMIT_RPS` | `3.0` | Rate limit (requests per second) |
+
+### S&P Capital IQ
+
+| Variable | Default | Description |
+|---|---|---|
+| `CAPITALIQ_PROVIDER` | `mock` | `mock` for local dev, `rest` for production |
+| `CAPITALIQ_API_URL` | (empty) | Capital IQ API base URL |
+| `CAPITALIQ_API_KEY` | (empty) | Capital IQ API key |
+| `CAPITALIQ_TIMEOUT` | `30.0` | Per-request timeout in seconds |
+| `CAPITALIQ_MAX_RETRIES` | `3` | Max retry attempts |
+| `CAPITALIQ_SKIP_IF_PB_COMPLETE` | `true` | Skip CIQ when PitchBook has full data |
 
 ---
 
@@ -199,7 +227,7 @@ For production, replace Docker services with managed equivalents:
 | Endpoint | Purpose | What It Checks |
 |---|---|---|
 | `GET /api/v1/health` | Liveness probe | Database connectivity |
-| `GET /api/v1/readiness` | Readiness probe | Database + MCP connectors |
+| `GET /api/v1/readiness` | Readiness probe | Database + all connectors (PitchBook, BizAPI, Capital IQ) |
 | `GET /api/v1/connectors/status` | Operational | Connector-by-connector health |
 
 ### Monitoring
@@ -219,10 +247,17 @@ source_extracted        source=ENR count=15
 # LLM calls
 mock_llm_complete       prompt_length=1935
 
+# Enrichment providers
+bizapi_enrichment_complete   run_id=... matched=N not_found=N errors=N
+capitaliq_enrichment_complete run_id=... matched=N not_found=N skipped=N errors=N
+pitchbook_enrichment_complete run_id=... matched=N not_found=N
+
 # Errors
-source_extraction_failed  source=... error=...
-web_enrichment_failed     company=... error=...
-pitchbook_enrichment_failed company=... error=...
+source_extraction_failed       source=... error=...
+web_enrichment_failed          company=... error=...
+bizapi_enrichment_failed       company=... error=...
+capitaliq_enrichment_failed    company=... error=...
+pitchbook_enrichment_failed    company=... error=...
 ```
 
 ### Database Migrations
@@ -250,6 +285,7 @@ alembic current
 | Worker | Horizontal: run multiple worker containers (ARQ distributes jobs) |
 | Database | Vertical (read replicas for reporting queries) |
 | LLM calls | Rate-limited via `LLM_RATE_LIMIT_RPM`; increase for higher throughput |
+| BizAPI | Rate-limited at 3 req/s; per-run enforcement via token bucket |
 | Pipeline | Single-run serial; multiple runs can execute concurrently via separate workers |
 
 ---
@@ -287,10 +323,19 @@ Create `profiles/your_industry.yaml` with:
 
 ### Connecting Real PitchBook
 
-1. Set `PITCHBOOK_PROVIDER=mcp` in `.env`
-2. Set `MCP_PITCHBOOK_URL` and `MCP_PITCHBOOK_TOKEN`
-3. Implement MCP tool calls in `app/miner/pitchbook/mcp_client.py`:
-   - `search_company(name)` → search results
-   - `get_company_detail(entity_id)` → ownership, investors
-   - `get_debt_details(entity_id)` → facility info
-   - `get_competitors(entity_id)` → competitor list
+1. Set `PITCHBOOK_PROVIDER=rest` in `.env` (or `mcp` for MCP server)
+2. For REST: set `PITCHBOOK_API_KEY`
+3. For MCP: set `MCP_PITCHBOOK_URL` and `MCP_PITCHBOOK_TOKEN`, implement tool calls in `app/miner/pitchbook/mcp_client.py`
+
+### Connecting Real BizAPI
+
+1. Set `BIZAPI_PROVIDER=rest` in `.env`
+2. Set `BIZAPI_USERNAME` and `BIZAPI_PASSWORD`
+3. Set `BIZAPI_USE_SANDBOX=true` for initial testing
+4. Client is fully implemented in `app/miner/enrichment/bizapi/rest_client.py`
+
+### Connecting Real Capital IQ
+
+1. Set `CAPITALIQ_PROVIDER=rest` in `.env`
+2. Set `CAPITALIQ_API_URL` and `CAPITALIQ_API_KEY`
+3. Client is fully implemented in `app/miner/enrichment/capitaliq/rest_client.py`

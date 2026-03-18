@@ -11,7 +11,7 @@ DL Origination Assistant is a FastAPI application with two engines — **Recomme
 │  ┌───────────────┐  ┌────────────────┐  ┌────────────────┐  │
 │  │  Recommender   │  │     Miner      │  │   AI Layer     │  │
 │  │    Engine      │  │    Engine      │  │ LLM + MCP +    │  │
-│  │                │  │  (10 stages)   │  │ Prompt Library  │  │
+│  │                │  │  (12 stages)   │  │ Prompt Library  │  │
 │  └───────┬────────┘  └───────┬────────┘  └───────┬────────┘  │
 │          │                   │                    │           │
 │  ┌───────┴───────────────────┴────────────────────┴────────┐ │
@@ -49,13 +49,23 @@ app/
 │   └── engine.py                    # Theme → sub-verticals → sources
 │
 ├── miner/                           # Miner Engine
-│   ├── engine.py                    # 10-stage pipeline orchestrator
+│   ├── engine.py                    # 12-stage pipeline orchestrator
 │   ├── dedup.py                     # RapidFuzz fuzzy deduplication
 │   ├── dispositioning.py            # Deterministic disposition rules
 │   ├── enrichment/
 │   │   ├── web_enricher.py          # LLM-assisted company enrichment
 │   │   ├── size_estimator.py        # Revenue/employee estimation
-│   │   └── exposure_classifier.py   # Industry exposure intensity
+│   │   ├── exposure_classifier.py   # Industry exposure intensity
+│   │   ├── bizapi/                  # NAICS BizAPI enrichment client
+│   │   │   ├── adapter.py           # BizAPIAdapter ABC
+│   │   │   ├── rest_client.py       # BizAPI REST client (Basic Auth, retry, rate limit)
+│   │   │   ├── mock_client.py       # Mock client for local dev
+│   │   │   └── normalizers.py       # Response → canonical field mapping
+│   │   └── capitaliq/               # S&P Capital IQ enrichment client
+│   │       ├── adapter.py           # CapitalIQAdapter ABC
+│   │       ├── rest_client.py       # CIQ REST client (API key auth, retry)
+│   │       ├── mock_client.py       # Mock client for local dev
+│   │       └── normalizers.py       # Response → canonical field mapping
 │   ├── sources/
 │   │   ├── base_adapter.py          # SourceAdapter ABC
 │   │   ├── registry.py              # Adapter routing + mock detection
@@ -145,7 +155,7 @@ User Input                    Recommender                           Miner
   │                               │                                  │
   │  POST /execute                │                                  │
   ├──────────────────────────────────────────────────────────────────►│
-  │                                                    10-stage pipeline
+  │                                                    12-stage pipeline
   │                                                    (see below)
   │◄─────────────────────────────────────────────────────────────────┤
   │  {companies, review_items, exports}                              │
@@ -168,22 +178,28 @@ Stage 3: web_enhancement
 Stage 4: dispositioning
   CompanyRecord[] → assign_disposition() → PRIMARY | CASCADE_ANCHOR | EXCLUDE
      │
-Stage 5: pitchbook_enrichment
+Stage 5: bizapi_enrichment
+  Eligible → BizAPIAdapter → DUNS, NAICS/SIC, verified address, firmographics
+     │
+Stage 6: pitchbook_enrichment
   Primary + Anchor → PitchBookAdapter → ownership, debt, competitors
      │
-Stage 6: cascade_expansion
+Stage 7: capitaliq_enrichment
+  Eligible (PB gaps) → CapitalIQAdapter → revenue, EBITDA, debt, credit metrics
+     │
+Stage 8: cascade_expansion
   Cascade Anchors → PitchBook competitors → new CompanyRecord[]
      │
-Stage 7: final_dedup
+Stage 9: final_dedup
   All companies → deduplicate_names() → remove merged, add review items
      │
-Stage 8: qa_validation
+Stage 10: qa_validation
   Primary companies → run_qa_gates() → 6 checks → flag review_required
      │
-Stage 9: scoring
+Stage 11: scoring
   Eligible companies → score_company() → total_score + components
      │
-Stage 10: export
+Stage 12: export
   All companies → ExportService → CSV + JSON + Excel files
 ```
 
@@ -196,6 +212,10 @@ All external dependencies have mock implementations:
 - `PITCHBOOK_PROVIDER=mock` → `MockPitchBookClient` with synthetic data
 - `PITCHBOOK_PROVIDER=rest` → `PitchBookRESTClient` with real API (requires `PITCHBOOK_API_KEY`)
 - `PITCHBOOK_PROVIDER=mcp` → `PitchBookMCPClient` (stubbed; requires MCP server)
+- `BIZAPI_PROVIDER=mock` → `MockBizAPIClient` with synthetic firmographic data
+- `BIZAPI_PROVIDER=rest` → `BizAPIRESTClient` with real API (requires username/password)
+- `CAPITALIQ_PROVIDER=mock` → `MockCapitalIQClient` with synthetic financial data
+- `CAPITALIQ_PROVIDER=rest` → `CapitalIQRESTClient` with real API (requires API key)
 - `SourceRegistry` auto-detects mock mode → `MockSourceAdapter`
 
 The full pipeline runs end-to-end without any API keys or external services.
@@ -262,17 +282,21 @@ tests/
 ├── test_smoke/              # Import, config, schema, export smoke tests
 ├── test_pipeline/           # Full pipeline + orchestrator integration
 ├── test_recommendation/     # Recommender engine unit tests
-├── test_enrichment/         # Size estimator, exposure classifier, web enricher
+├── test_enrichment/         # Size estimator, exposure classifier, BizAPI, Capital IQ
+│   ├── test_bizapi/         # BizAPI REST client, mock client, normalizers, match selection
+│   └── test_capitaliq/      # Capital IQ REST client, mock client, normalizers
+├── test_pitchbook/          # PitchBook REST client tests
 ├── test_sources/            # NAICS, mock, web scraper adapter tests
 ├── test_scoring/            # Company scorer unit tests
 ├── test_validation/         # QA check unit tests
 ├── test_workflow/           # Dedup, dispositioning, review queue tests
 ├── test_api/                # FastAPI endpoint tests (TestClient)
 ├── test_utils/              # Normalization tests
+├── fixtures/                # JSON test fixtures (BizAPI, Capital IQ, PitchBook, etc.)
 └── conftest.py              # Shared fixtures
 ```
 
-All 200 tests run with `pytest tests/ -v` — no external services required.
+All 303 tests run with `pytest tests/ -v` — no external services required.
 
 ## Implementation Status
 
@@ -283,11 +307,16 @@ All 200 tests run with `pytest tests/ -v` — no external services required.
 | FastAPI app factory + lifespan | **Complete** | `create_app()` pattern, CORS, 6 router modules |
 | Pydantic domain models | **Complete** | CompanyRecord, RunConfig, ReviewQueueItem, AIProvenance, all enums |
 | Recommender Engine | **Complete** | Theme → sub-verticals → sources via LLM prompts |
-| Miner Engine (10 stages) | **Complete** | Full pipeline with checkpoint/resume support |
+| Miner Engine (12 stages) | **Complete** | Full pipeline with checkpoint/resume support |
 | ClaudeLLMService | **Complete** | Retry/backoff, auth validation, rate limit, error handling, validated live |
 | MockLLMService | **Complete** | Fixture-based responses, keyword detection, deterministic |
 | MockPitchBookClient | **Complete** | Synthetic ownership, debt, competitor data |
 | PitchBookRESTClient | **Complete** | REST API v2 client with retry/backoff (requires API key) |
+| BizAPIRESTClient | **Complete** | NAICS BizAPI client with Basic Auth, rate limiting (3 req/s), retry/backoff |
+| MockBizAPIClient | **Complete** | Synthetic firmographic data for local dev |
+| CapitalIQRESTClient | **Complete** | S&P Capital IQ client with API key auth, retry/backoff |
+| MockCapitalIQClient | **Complete** | Synthetic financial data for local dev |
+| Cross-source conflict detection | **Complete** | Revenue/ownership conflict → review queue routing |
 | MockSourceAdapter | **Complete** | Source-type-aware synthetic company generation |
 | Fuzzy dedup (RapidFuzz) | **Complete** | Configurable thresholds, merge vs review routing |
 | Deterministic dispositioning | **Complete** | Revenue/geography/public-company rules |
