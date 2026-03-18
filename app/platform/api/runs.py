@@ -29,6 +29,35 @@ class CreateRunRequest(BaseModel):
     boundary_treatment: str = "watch"
 
 
+@router.get("")
+async def list_runs(
+    limit: int = 50,
+    offset: int = 0,
+    session: AsyncSession = Depends(get_db),
+):
+    """List all runs, newest first."""
+    repo = RunRepository(session)
+    runs = await repo.list_runs(limit=limit)
+    # Apply offset in-memory (list_runs doesn't support offset yet)
+    page = runs[offset : offset + limit]
+    return {
+        "total": len(runs),
+        "limit": limit,
+        "offset": offset,
+        "runs": [
+            {
+                "id": r.id,
+                "theme": r.config.get("theme", "") if r.config else "",
+                "status": r.status,
+                "current_stage": r.current_stage,
+                "created_at": r.created_at.isoformat(),
+                "updated_at": r.updated_at.isoformat(),
+            }
+            for r in page
+        ],
+    }
+
+
 @router.post("")
 async def create_run(req: CreateRunRequest, session: AsyncSession = Depends(get_db)):
     """Create a new origination run."""

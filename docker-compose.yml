@@ -9,6 +9,9 @@ services:
       - ./app:/app/app
       - ./profiles:/app/profiles
       - ./data:/app/data
+      - ./frontend/dist:/app/frontend/dist
+    environment:
+      SERVE_FRONTEND: "true"
     env_file:
       - .env
     depends_on:
