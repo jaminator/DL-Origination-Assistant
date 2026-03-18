@@ -60,7 +60,7 @@ class PitchBookMCPConnector(MCPConnector):
 
     def __init__(self) -> None:
         self._url = settings.mcp_pitchbook_url
-        self._token = settings.mcp_pitchbook_token
+        self._token = settings.mcp_pitchbook_token.get_secret_value()
 
     async def is_available(self) -> bool:
         return bool(self._url and self._token)

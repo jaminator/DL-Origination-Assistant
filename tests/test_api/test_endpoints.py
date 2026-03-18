@@ -26,16 +26,16 @@ def client(mock_session):
     async def override_get_db():
         yield mock_session
 
-    with patch("app.platform.persistence.database.init_db", new_callable=AsyncMock):
-        with patch("app.platform.persistence.database.close_db", new_callable=AsyncMock):
-            from app.main import app
-            from app.platform.api.deps import get_db
-            app.dependency_overrides[get_db] = override_get_db
-            # Mock DB session.execute for health check
-            mock_session.execute.return_value = MagicMock()
-            with TestClient(app) as c:
-                yield c
-            app.dependency_overrides.clear()
+    with patch("app.platform.persistence.database.init_db", new_callable=AsyncMock), \
+         patch("app.platform.persistence.database.close_db", new_callable=AsyncMock):
+        from app.main import app
+        from app.platform.api.deps import get_db
+        app.dependency_overrides[get_db] = override_get_db
+        # Mock DB session.execute for health check
+        mock_session.execute.return_value = MagicMock()
+        with TestClient(app) as c:
+            yield c
+        app.dependency_overrides.clear()
 
 
 class TestRunEndpoints:

@@ -107,8 +107,8 @@ async def rerun_stage(run_id: str, stage: str, session: AsyncSession = Depends(g
 
     try:
         ws = WorkflowStage(stage)
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Unknown stage: {stage}")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Unknown stage: {stage}") from exc
 
     run_repo = RunRepository(session)
     run = await run_repo.get(run_id)

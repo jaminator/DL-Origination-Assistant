@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
+from pydantic import SecretStr
 
 from app.ai.llm_service import (
     ClaudeLLMService,
@@ -23,7 +24,7 @@ from app.ai.llm_service import (
 def mock_settings():
     """Patch settings to provide a fake API key."""
     with patch("app.ai.llm_service.settings") as s:
-        s.llm_api_key = "sk-test-fake-key"
+        s.llm_api_key = SecretStr("sk-test-fake-key")
         s.llm_model = "claude-sonnet-4-6"
         yield s
 
@@ -48,7 +49,7 @@ class TestClaudeLLMServiceInit:
 
     def test_missing_api_key_raises(self):
         with patch("app.ai.llm_service.settings") as s:
-            s.llm_api_key = ""
+            s.llm_api_key = SecretStr("")
             s.llm_model = "claude-sonnet-4-6"
             with pytest.raises(LLMAuthError, match="LLM_API_KEY is required"):
                 ClaudeLLMService()

@@ -174,7 +174,7 @@ class WebScraperAdapter(SourceAdapter):
                 if score > best_score:
                     best_score = score
                     best_names = filtered
-            except Exception:
+            except Exception:  # noqa: S112
                 continue
 
         # If no selector worked well, try extracting from bold/strong tags in lists

@@ -22,6 +22,7 @@ dependencies = [
     "arq>=0.26",
     "openpyxl>=3.1",
     "rapidfuzz>=3.10",
+    "numpy>=1.26",
     "structlog>=24.4",
     "pyyaml>=6.0",
     "beautifulsoup4>=4.12",
@@ -50,10 +51,13 @@ target-version = "py311"
 line-length = 120
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "UP"]
+select = ["E", "F", "I", "N", "W", "UP", "ASYNC", "S", "B", "SIM", "TCH", "RUF"]
+ignore = ["S101"]  # allow assert in tests
 
 [tool.ruff.lint.per-file-ignores]
 "app/ai/prompts/*.py" = ["E501"]  # Prompt templates have long string literals
+"app/platform/api/*.py" = ["B008"]  # FastAPI Depends() in function defaults is idiomatic
+"tests/**/*.py" = ["S105", "S106", "S108", "S603"]  # Test fixtures use hardcoded creds and temp dirs
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

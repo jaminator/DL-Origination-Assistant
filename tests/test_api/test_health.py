@@ -16,15 +16,15 @@ def client():
     async def override_get_db():
         yield mock_session
 
-    with patch("app.platform.persistence.database.init_db", new_callable=AsyncMock):
-        with patch("app.platform.persistence.database.close_db", new_callable=AsyncMock):
-            from app.main import app
-            from app.platform.api.deps import get_db
+    with patch("app.platform.persistence.database.init_db", new_callable=AsyncMock), \
+         patch("app.platform.persistence.database.close_db", new_callable=AsyncMock):
+        from app.main import app
+        from app.platform.api.deps import get_db
 
-            app.dependency_overrides[get_db] = override_get_db
-            with TestClient(app) as c:
-                yield c
-            app.dependency_overrides.clear()
+        app.dependency_overrides[get_db] = override_get_db
+        with TestClient(app) as c:
+            yield c
+        app.dependency_overrides.clear()
 
 
 def test_health_endpoint(client):

@@ -1,6 +1,7 @@
 """ARQ worker setup for background job processing."""
 
 import asyncio
+from typing import ClassVar
 
 from arq.connections import RedisSettings
 
@@ -29,11 +30,18 @@ async def run_pipeline_job(ctx: dict, run_id: str) -> dict:
 
     logger.info("job_pipeline_start", run_id=run_id)
 
-    async with async_session() as session:
+    async with async_session()() as session:
         run_repo = RunRepository(session)
         checkpoint_repo = CheckpointRepository(session)
         company_repo = CompanyRepository(session)
         review_repo = ReviewRepository(session)
+
+        # Idempotency guard: skip if already running or completed
+        run = await run_repo.get(run_id)
+        if run and run.status in ("running", "completed"):
+            logger.warning("pipeline_skipped", run_id=run_id, status=run.status)
+            return {"skipped": True, "reason": f"already_{run.status}"}
+
         storage = get_storage()
         llm = get_llm_service()
         pb = get_pitchbook_adapter()
@@ -78,7 +86,7 @@ async def resume_pipeline_job(ctx: dict, run_id: str) -> dict:
 
     logger.info("job_resume_start", run_id=run_id)
 
-    async with async_session() as session:
+    async with async_session()() as session:
         run_repo = RunRepository(session)
         checkpoint_repo = CheckpointRepository(session)
         company_repo = CompanyRepository(session)
@@ -111,10 +119,12 @@ async def resume_pipeline_job(ctx: dict, run_id: str) -> dict:
 class WorkerSettings:
     """ARQ worker settings."""
 
-    functions = [run_pipeline_job, resume_pipeline_job]
+    functions: ClassVar[list] = [run_pipeline_job, resume_pipeline_job]
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     max_jobs = 2
-    job_timeout = 3600  # 1 hour
+    job_timeout = 600  # 12 stages, ~10 min max
+    max_tries = 3
+    keep_result = 3600  # 1 hour
 
 
 async def main():

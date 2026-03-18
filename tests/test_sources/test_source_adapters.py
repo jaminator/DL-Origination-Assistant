@@ -272,9 +272,9 @@ class TestWebScraperRetry:
             raise httpx.ConnectError("connection refused")
 
         with patch.object(httpx.AsyncClient, "get", mock_get), \
-             patch("app.miner.sources.web_scraper.asyncio.sleep", new_callable=AsyncMock):
-            with pytest.raises(httpx.ConnectError):
-                await adapter._fetch_page("https://example.com")
+             patch("app.miner.sources.web_scraper.asyncio.sleep", new_callable=AsyncMock), \
+             pytest.raises(httpx.ConnectError):
+            await adapter._fetch_page("https://example.com")
 
     @pytest.mark.asyncio
     async def test_extract_companies_returns_empty_on_fetch_failure(self):

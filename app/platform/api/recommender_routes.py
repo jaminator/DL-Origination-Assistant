@@ -171,9 +171,7 @@ async def confirm_sources(
             confirmed.append(s.data)
         elif req.deselected_ids and s.id in req.deselected_ids:
             continue
-        elif req.selected_ids and s.id in req.selected_ids:
-            confirmed.append(s.data)
-        elif s.user_selected:
+        elif (req.selected_ids and s.id in req.selected_ids) or s.user_selected:
             confirmed.append(s.data)
 
     run_repo = RunRepository(session)

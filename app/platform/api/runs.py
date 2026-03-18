@@ -181,6 +181,6 @@ async def get_checkpoint(run_id: str, checkpoint_id: str, session: AsyncSession 
         if matching:
             data = await storage.load_json(matching[0])
             return data
-    except Exception:
+    except Exception:  # noqa: S110
         pass
     raise HTTPException(status_code=404, detail="Checkpoint not found")

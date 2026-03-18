@@ -37,7 +37,7 @@ class CapitalIQRESTClient(CapitalIQAdapter):
         max_retries: int | None = None,
     ):
         self._base_url = (base_url or settings.capitaliq_api_url).rstrip("/")
-        self._api_key = api_key or settings.capitaliq_api_key
+        self._api_key = api_key or settings.capitaliq_api_key.get_secret_value()
         self._timeout = timeout or settings.capitaliq_timeout
         self._max_retries = max_retries if max_retries is not None else settings.capitaliq_max_retries
         self._client: httpx.AsyncClient | None = None

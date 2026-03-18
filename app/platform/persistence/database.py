@@ -52,7 +52,16 @@ def configure_engine(url: str, **kwargs) -> AsyncEngine:
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     session_factory = _get_sessionmaker()
     async with session_factory() as session:
-        yield session
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+
+
+def async_session() -> async_sessionmaker[AsyncSession]:
+    """Public accessor for ARQ worker."""
+    return _get_sessionmaker()
 
 
 async def init_db() -> None:

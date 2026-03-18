@@ -60,7 +60,7 @@ class BizAPIRESTClient(BizAPIAdapter):
             self._base_url = settings.bizapi_api_url.rstrip("/")
 
         self._username = username or settings.bizapi_username
-        self._password = password or settings.bizapi_password
+        self._password = password or settings.bizapi_password.get_secret_value()
         self._timeout = timeout or settings.bizapi_timeout
         self._max_retries = max_retries if max_retries is not None else settings.bizapi_max_retries
         self._rate_limit_rps = rate_limit_rps or settings.bizapi_rate_limit_rps

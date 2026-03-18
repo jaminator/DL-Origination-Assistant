@@ -40,7 +40,7 @@ class TestSizeEstimator:
         assert band == ""
 
     def test_revenue_from_employees_negative(self):
-        revenue, band = estimate_revenue_from_employees(-10)
+        revenue, _band = estimate_revenue_from_employees(-10)
         assert revenue is None
 
     def test_classify_revenue_band_boundaries(self):

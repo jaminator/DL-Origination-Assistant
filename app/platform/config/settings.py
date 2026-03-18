@@ -1,5 +1,6 @@
 """Application settings loaded from environment variables."""
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 
 
@@ -16,15 +17,15 @@ class Settings(BaseSettings):
     # AI / LLM
     llm_provider: str = "mock"  # "claude" or "mock"
     llm_model: str = "claude-sonnet-4-6"
-    llm_api_key: str = ""
+    llm_api_key: SecretStr = SecretStr("")
     llm_rate_limit_rpm: int = 50
 
     # PitchBook
     pitchbook_provider: str = "mock"  # "rest", "mcp", or "mock"
     mcp_pitchbook_url: str = ""
-    mcp_pitchbook_token: str = ""
+    mcp_pitchbook_token: SecretStr = SecretStr("")
     pitchbook_api_base_url: str = "https://api.pitchbook.com/v2"
-    pitchbook_api_key: str = ""
+    pitchbook_api_key: SecretStr = SecretStr("")
     pitchbook_api_timeout: float = 30.0
     pitchbook_api_max_retries: int = 3
 
@@ -33,7 +34,7 @@ class Settings(BaseSettings):
     bizapi_api_url: str = "https://api.naics.com/v1"
     bizapi_sandbox_url: str = "https://sandbox.naics.com/v1"
     bizapi_username: str = ""
-    bizapi_password: str = ""
+    bizapi_password: SecretStr = SecretStr("")
     bizapi_use_sandbox: bool = True
     bizapi_timeout: float = 15.0
     bizapi_max_retries: int = 3
@@ -42,7 +43,7 @@ class Settings(BaseSettings):
     # S&P Capital IQ
     capitaliq_provider: str = "mock"  # "rest" or "mock"
     capitaliq_api_url: str = ""
-    capitaliq_api_key: str = ""
+    capitaliq_api_key: SecretStr = SecretStr("")
     capitaliq_timeout: float = 30.0
     capitaliq_max_retries: int = 3
     capitaliq_skip_if_pb_complete: bool = True

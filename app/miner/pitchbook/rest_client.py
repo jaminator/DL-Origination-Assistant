@@ -51,7 +51,7 @@ class PitchBookRESTClient(PitchBookAdapter):
         max_retries: int = 3,
     ):
         self._base_url = (base_url or settings.pitchbook_api_base_url).rstrip("/")
-        self._api_key = api_key or settings.pitchbook_api_key
+        self._api_key = api_key or settings.pitchbook_api_key.get_secret_value()
         self._timeout = timeout
         self._max_retries = max_retries
         self._client: httpx.AsyncClient | None = None

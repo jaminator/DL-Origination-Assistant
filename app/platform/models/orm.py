@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, Integer, String, Text, TypeDecorator
+from sqlalchemy import JSON, Boolean, DateTime, Float, Index, Integer, String, Text, TypeDecorator
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -39,6 +39,10 @@ class RunRecord(Base):
 
 class CompanyRow(Base):
     __tablename__ = "companies"
+    __table_args__ = (
+        Index("ix_companies_run_disposition", "run_id", "disposition"),
+        Index("ix_companies_run_review", "run_id", "review_required"),
+    )
 
     id: Mapped[str] = mapped_column(GUID(), primary_key=True, default=lambda: str(uuid4()))
     run_id: Mapped[str] = mapped_column(GUID(), nullable=False, index=True)
@@ -87,6 +91,9 @@ class SourceRecommendationRow(Base):
 
 class CheckpointRow(Base):
     __tablename__ = "checkpoints"
+    __table_args__ = (
+        Index("ix_checkpoints_run_stage", "run_id", "stage"),
+    )
 
     id: Mapped[str] = mapped_column(GUID(), primary_key=True, default=lambda: str(uuid4()))
     run_id: Mapped[str] = mapped_column(GUID(), nullable=False, index=True)
@@ -99,6 +106,9 @@ class CheckpointRow(Base):
 
 class ReviewQueueRow(Base):
     __tablename__ = "review_queue"
+    __table_args__ = (
+        Index("ix_review_queue_run_resolved", "run_id", "resolved"),
+    )
 
     id: Mapped[str] = mapped_column(GUID(), primary_key=True, default=lambda: str(uuid4()))
     run_id: Mapped[str] = mapped_column(GUID(), nullable=False, index=True)

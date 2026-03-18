@@ -1,6 +1,7 @@
 """Fuzzy deduplication engine using RapidFuzz."""
 
 from rapidfuzz import fuzz
+from rapidfuzz.process import cdist
 
 from app.platform.config.defaults import FUZZY_DEDUP_AUTO_MERGE_THRESHOLD, FUZZY_DEDUP_REVIEW_THRESHOLD
 from app.platform.utils.logging import get_logger
@@ -22,31 +23,37 @@ def deduplicate_names(
 ) -> DedupResult:
     """Run fuzzy dedup on a list of company names.
 
+    Uses rapidfuzz.process.cdist for vectorized pairwise comparison.
+
     - Score >= auto_merge_threshold → auto-merge (keep first seen)
     - Score >= review_threshold → route to review queue
     - Score < review_threshold → treat as distinct
     """
     result = DedupResult()
-    normalized = [(name, normalize_company_name(name)) for name in names]
-    seen: list[tuple[str, str]] = []  # (original, normalized)
+    if len(names) < 2:
+        return result
 
-    for orig, norm in normalized:
-        best_match = None
-        best_score = 0.0
+    normalized = [normalize_company_name(name) for name in names]
+    matrix = cdist(
+        normalized, normalized,
+        scorer=fuzz.token_sort_ratio,
+        score_cutoff=review_threshold,
+    )
 
-        for seen_orig, seen_norm in seen:
-            score = fuzz.token_sort_ratio(norm, seen_norm)
-            if score > best_score:
-                best_score = score
-                best_match = seen_orig
-
-        if best_match and best_score >= auto_merge_threshold:
-            result.merged.append((best_match, orig, best_score))
-            logger.debug("dedup_auto_merge", kept=best_match, merged=orig, score=best_score)
-        elif best_match and best_score >= review_threshold:
-            result.review.append((best_match, orig, best_score))
-            logger.debug("dedup_review", name_a=best_match, name_b=orig, score=best_score)
-        else:
-            seen.append((orig, norm))
+    seen: set[int] = set()
+    for i in range(len(names)):
+        if i in seen:
+            continue
+        for j in range(i + 1, len(names)):
+            if j in seen:
+                continue
+            score = matrix[i][j]
+            if score >= auto_merge_threshold:
+                result.merged.append((names[i], names[j], score))
+                seen.add(j)
+                logger.debug("dedup_auto_merge", kept=names[i], merged=names[j], score=score)
+            elif score >= review_threshold:
+                result.review.append((names[i], names[j], score))
+                logger.debug("dedup_review", name_a=names[i], name_b=names[j], score=score)
 
     return result

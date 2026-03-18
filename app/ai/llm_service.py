@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 import time
 from abc import ABC, abstractmethod
 from typing import Any
@@ -79,13 +80,18 @@ class ClaudeLLMService(LLMService):
     REQUEST_TIMEOUT = 120.0  # seconds
 
     def __init__(self):
-        if not settings.llm_api_key:
+        if not settings.llm_api_key.get_secret_value():
             raise LLMAuthError(
                 "LLM_API_KEY is required when LLM_PROVIDER=claude. "
                 "Set the LLM_API_KEY environment variable to your Anthropic API key."
             )
-        self.api_key = settings.llm_api_key
+        self.api_key = settings.llm_api_key.get_secret_value()
         self.model = settings.llm_model
+        if re.match(r".*-\d{8}$", self.model):
+            raise ValueError(
+                f"Model ID '{self.model}' contains a date suffix. "
+                "Use 'claude-sonnet-4-6' or similar."
+            )
         self.base_url = "https://api.anthropic.com/v1"
         self._client: httpx.AsyncClient | None = None
 

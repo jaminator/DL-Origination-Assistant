@@ -301,6 +301,7 @@ class TestFactory:
         with patch("app.miner.pitchbook.mcp_client.settings") as mock_settings:
             mock_settings.pitchbook_provider = "mcp"
             mock_settings.mcp_pitchbook_url = "http://localhost:3000"
-            mock_settings.mcp_pitchbook_token = "test-token"
+            from pydantic import SecretStr
+            mock_settings.mcp_pitchbook_token = SecretStr("test-token")
             adapter = get_pitchbook_adapter()
             assert isinstance(adapter, PitchBookMCPClient)

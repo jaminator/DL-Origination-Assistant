@@ -41,10 +41,14 @@ def check_cascade_anchor_bleed(company: CompanyRecord) -> ValidationResult:
 
 def check_mega_cap(company: CompanyRecord) -> ValidationResult:
     """Sanity check: public companies with very high revenue should not be primary candidates."""
-    if company.is_public and company.revenue_estimate and company.revenue_estimate > 5000:
-        if company.disposition == Disposition.PRIMARY:
-            msg = f"Public mega-cap (${company.revenue_estimate}M) as primary"
-            return ValidationResult(False, "mega_cap_sanity", msg)
+    if (
+        company.is_public
+        and company.revenue_estimate
+        and company.revenue_estimate > 5000
+        and company.disposition == Disposition.PRIMARY
+    ):
+        msg = f"Public mega-cap (${company.revenue_estimate}M) as primary"
+        return ValidationResult(False, "mega_cap_sanity", msg)
     return ValidationResult(True, "mega_cap_sanity")
 
 
@@ -57,8 +61,10 @@ def check_geography(company: CompanyRecord, allowed: list[str] | None = None) ->
 
 
 def check_score_sanity(company: CompanyRecord) -> ValidationResult:
-    """Ensure scores are within valid bounds."""
+    """Ensure scores are within valid bounds. Score > 95 suggests data error."""
     if company.total_score is not None:
-        if company.total_score < 0 or company.total_score > 100:
-            return ValidationResult(False, "score_sanity", f"Score {company.total_score} out of [0, 100] bounds")
+        if company.total_score > 95:
+            return ValidationResult(False, "score_sanity", f"Score {company.total_score:.1f} > 95 suggests data error")
+        if company.total_score < 0:
+            return ValidationResult(False, "score_sanity", f"Score {company.total_score:.1f} is negative")
     return ValidationResult(True, "score_sanity")
