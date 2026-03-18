@@ -6,8 +6,15 @@ DL Origination Assistant is a FastAPI application with two engines — **Recomme
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                     FastAPI Application                       │
-│                                                              │
+│                    React Frontend (Vite + TS)                  │
+│                                                               │
+│  Dashboard │ RunSetup │ SubVerticals │ Sources │ Pipeline     │
+│  Companies │ CompanyDetail │ ReviewQueue │ Exports │ Settings │
+└──────────────────────┬────────────────────────────────────────┘
+                       │ REST API (/api/v1/*)
+┌──────────────────────┴───────────────────────────────────────┐
+│                     FastAPI Application                        │
+│                                                               │
 │  ┌───────────────┐  ┌────────────────┐  ┌────────────────┐  │
 │  │  Recommender   │  │     Miner      │  │   AI Layer     │  │
 │  │    Engine      │  │    Engine      │  │ LLM + MCP +    │  │
@@ -31,8 +38,39 @@ DL Origination Assistant is a FastAPI application with two engines — **Recomme
 ## Module Layout
 
 ```
+frontend/                               # React 19 + TypeScript + Vite
+├── src/
+│   ├── main.tsx                        # App entry + React Router
+│   ├── App.tsx                         # Route definitions
+│   ├── pages/
+│   │   ├── Dashboard.tsx               # Run list + create new run
+│   │   ├── RunSetup.tsx                # Theme + config input form
+│   │   ├── SubVerticals.tsx            # AI sub-vertical recommendations
+│   │   ├── Sources.tsx                 # Source + NAICS recommendations
+│   │   ├── Pipeline.tsx                # 12-stage execution with live progress
+│   │   ├── Companies.tsx               # Scored company table (sortable/filterable)
+│   │   ├── CompanyDetail.tsx           # Single company deep-dive
+│   │   ├── ReviewQueue.tsx             # Dedup + QA review items
+│   │   ├── Exports.tsx                 # Download CSV/JSONL/Excel
+│   │   └── Settings.tsx                # Connector status + config
+│   ├── components/
+│   │   ├── layout/
+│   │   │   ├── AppShell.tsx            # Sidebar + content layout
+│   │   │   ├── TopBar.tsx              # Header with run context
+│   │   │   └── WorkflowRail.tsx        # Step-by-step workflow nav
+│   │   └── ui/                         # Reusable primitives (Radix-based)
+│   │       ├── Badge.tsx, Button.tsx, Card.tsx, Drawer.tsx
+│   │       ├── EmptyState.tsx, ScoreBar.tsx, Spinner.tsx, Toast.tsx
+│   ├── hooks/useStore.ts               # Zustand client state
+│   ├── lib/
+│   │   ├── api.ts                      # REST API client (all endpoints)
+│   │   └── utils.ts                    # Formatting helpers
+│   └── types/api.ts                    # TypeScript API response types
+├── package.json                        # React 19, Radix UI, TanStack Query/Table, Zustand
+└── vite.config.ts                      # Proxy /api → localhost:8000
+
 app/
-├── main.py                          # FastAPI app factory + lifespan
+├── main.py                          # FastAPI app factory + lifespan + SPA serving
 ├── cli.py                           # Typer CLI entrypoint
 │
 ├── ai/                              # AI Layer
@@ -128,6 +166,8 @@ app/
 
 ### End-to-End Workflow
 
+The React frontend guides users through each step via a workflow sidebar. All interactions go through the REST API.
+
 ```
 User Input                    Recommender                           Miner
 ─────────                    ───────────                           ─────
@@ -208,7 +248,8 @@ Stage 12: export
 ### Mock-First Development
 
 All external dependencies have mock implementations:
-- `LLM_PROVIDER=mock` → `MockLLMService` with fixture responses
+- `LLM_PROVIDER=mock` → `MockLLMService` with prompt-detection fixtures
+  (subvertical, source discovery, web enrichment, user-registered)
 - `PITCHBOOK_PROVIDER=mock` → `MockPitchBookClient` with synthetic data
 - `PITCHBOOK_PROVIDER=rest` → `PitchBookRESTClient` with real API (requires `PITCHBOOK_API_KEY`)
 - `PITCHBOOK_PROVIDER=mcp` → `PitchBookMCPClient` (stubbed; requires MCP server)
@@ -296,7 +337,7 @@ tests/
 └── conftest.py              # Shared fixtures
 ```
 
-All 303 tests run with `pytest tests/ -v` — no external services required.
+All 302 tests run with `pytest tests/ -v` — no external services required.
 
 ## Implementation Status
 
@@ -304,7 +345,8 @@ All 303 tests run with `pytest tests/ -v` — no external services required.
 
 | Component | Status | Notes |
 |---|---|---|
-| FastAPI app factory + lifespan | **Complete** | `create_app()` pattern, CORS, 6 router modules |
+| React frontend | **Complete** | 10 pages, Radix UI + Tailwind, TanStack Query, workflow nav, Docker-served |
+| FastAPI app factory + lifespan | **Complete** | `create_app()` pattern, CORS, 6 router modules, SPA static serving |
 | Pydantic domain models | **Complete** | CompanyRecord, RunConfig, ReviewQueueItem, AIProvenance, all enums |
 | Recommender Engine | **Complete** | Theme → sub-verticals → sources via LLM prompts |
 | Miner Engine (12 stages) | **Complete** | Full pipeline with checkpoint/resume support |
@@ -335,13 +377,13 @@ All 303 tests run with `pytest tests/ -v` — no external services required.
 | Prompt template system | **Complete** | Versioned prompts with structured output parsing |
 | ORM models (GUID portable) | **Complete** | Works on PostgreSQL (native UUID) and SQLite (String) |
 | Repository layer | **Complete** | Full CRUD; tested against real SQL (SQLite) |
-| Alembic migration | **Complete** | Initial schema with 8 tables; env var override support |
+| Alembic migrations | **Complete** | 0001: initial schema (8 tables), 0002: enrichment status columns; env var override |
 
 ### Stub / Skeleton (requires real credentials or connectors)
 
 | Component | Status | What's Missing |
 |---|---|---|
-| PitchBookMCPClient | **Stub** | Interface defined; MCP tool calls raise NotImplementedError |
+| PitchBookMCPClient | **Stub** | Interface defined; all methods raise NotImplementedError |
 | WebScraperAdapter | **Partial** | httpx + BeautifulSoup extraction works; no real URLs configured |
 | DirectoryAdapter | **Partial** | Scraping logic exists; no real directory URLs |
 | ResearchOrchestrator | **Stub** | Batch/retry framework exists; no integration with real connectors |

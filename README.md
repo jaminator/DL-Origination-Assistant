@@ -2,7 +2,7 @@
 
 A production-grade platform for automating direct-lending origination target mining. Accepts investment themes, recommends lender-friendly sub-verticals, discovers and enriches borrower candidates, and exports scored outreach lists.
 
-**303 tests passing** | Python 3.11+ | FastAPI + SQLAlchemy 2.0 async | Mock-first local dev
+**302 tests passing** | Python 3.11+ | FastAPI + SQLAlchemy 2.0 async | React 19 + TypeScript frontend | Mock-first local dev
 
 ## Documentation
 
@@ -15,26 +15,33 @@ A production-grade platform for automating direct-lending origination target min
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    FastAPI Backend                        │
-│                                                          │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐ │
-│  │ Recommender  │  │    Miner     │  │    AI Layer    │ │
-│  │   Engine     │  │    Engine    │  │  (LLM + MCP)   │ │
-│  └──────┬───────┘  └──────┬───────┘  └───────┬────────┘ │
-│         │                 │                   │          │
+┌──────────────────────────────────────────────────────────┐
+│                    React Frontend                          │
+│  Dashboard │ RunSetup │ SubVerticals │ Sources │ Pipeline │
+│  Companies │ CompanyDetail │ ReviewQueue │ Exports        │
+└──────────────────────┬───────────────────────────────────┘
+                       │ REST API
+┌──────────────────────┴───────────────────────────────────┐
+│                    FastAPI Backend                         │
+│                                                           │
+│  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐  │
+│  │ Recommender  │  │    Miner     │  │    AI Layer    │  │
+│  │   Engine     │  │    Engine    │  │  (LLM + MCP)   │  │
+│  └──────┬───────┘  └──────┬───────┘  └───────┬────────┘  │
+│         │                 │                   │           │
 │  ┌──────┴─────────────────┴───────────────────┴────────┐ │
 │  │              Shared Platform Layer                   │ │
 │  │  Config │ Persistence │ Workflow │ Scoring │ Export  │ │
 │  └─────────────────────────────────────────────────────┘ │
-└──────────────────────┬──────────────────────────────────┘
+└──────────────────────┬───────────────────────────────────┘
                        │
         ┌──────────────┼──────────────┐
         │              │              │
    PostgreSQL       Redis          Storage
 ```
 
-**Three engines:**
+**Four layers:**
+- **React Frontend** — Guided workflow UI with 10 pages (Dashboard, RunSetup, SubVerticals, Sources, Pipeline, Companies, CompanyDetail, ReviewQueue, Exports, Settings)
 - **Recommender Engine** — Theme → sub-vertical ranking → source recommendations
 - **Miner Engine** — Source extraction → multi-source enrichment (BizAPI, PitchBook, Capital IQ) → dedup → scoring → export
 - **AI/MCP Layer** — LLM service abstraction, MCP connectors, prompt library, confidence tracking
@@ -60,58 +67,48 @@ docker compose up --build
 ```
 
 This starts:
-- **api** — FastAPI on http://localhost:8000
+- **api** — FastAPI on http://localhost:8000 (serves both API and frontend)
 - **db** — PostgreSQL on localhost:5432
 - **redis** — Redis on localhost:6379
 - **worker** — ARQ background job worker
 
-### 3. Verify
+### 3. Open the UI
+
+Navigate to **http://localhost:8000** in your browser. The React frontend provides a guided workflow:
+
+1. **Dashboard** — Create a new run with an investment theme
+2. **Sub-Verticals** — Review and confirm AI-generated sub-vertical recommendations
+3. **Sources** — Review and confirm recommended data sources + NAICS codes
+4. **Pipeline** — Execute the 12-stage mining pipeline with live progress tracking
+5. **Companies** — Browse scored companies with sortable/filterable table
+6. **Exports** — Download CSV, JSONL, or multi-sheet Excel results
+
+### 4. Alternative: API / CLI usage
 
 ```bash
+# Health check
 curl http://localhost:8000/api/v1/health
-```
 
-### 4. Create a run
-
-```bash
-# Via API
+# Create a run via API
 curl -X POST http://localhost:8000/api/v1/runs \
   -H "Content-Type: application/json" \
   -d '{"theme": "data center capex secular growth"}'
 
-# Via CLI (requires local pip install)
+# Or via CLI (requires local pip install)
 pip install -e .
 dl-origination run create --theme "data center capex secular growth"
 ```
 
-### 5. Run the recommendation flow
+### 5. Resetting the database
+
+If you encounter schema errors after code updates (e.g., missing columns), reset the database:
 
 ```bash
-# Generate sub-vertical recommendations
-curl -X POST http://localhost:8000/api/v1/runs/{run_id}/recommend-subverticals
-
-# List recommendations
-curl http://localhost:8000/api/v1/runs/{run_id}/subverticals
-
-# Confirm all
-curl -X POST http://localhost:8000/api/v1/runs/{run_id}/confirm-subverticals \
-  -H "Content-Type: application/json" \
-  -d '{"accept_all": true}'
-
-# Generate source recommendations
-curl -X POST http://localhost:8000/api/v1/runs/{run_id}/recommend-sources
-
-# Confirm sources
-curl -X POST http://localhost:8000/api/v1/runs/{run_id}/confirm-sources \
-  -H "Content-Type: application/json" \
-  -d '{"accept_all": true}'
+docker compose down -v    # -v removes the PostgreSQL volume
+docker compose up
 ```
 
-### 6. Execute the mining pipeline
-
-```bash
-curl -X POST http://localhost:8000/api/v1/runs/{run_id}/execute
-```
+`Base.metadata.create_all()` runs on startup and rebuilds all tables from the ORM models.
 
 ## Configuration
 
@@ -236,7 +233,7 @@ cp .env.example .env
 ### Running Tests
 
 ```bash
-# All 303 tests (no external services needed)
+# All 302 tests (no external services needed)
 pytest tests/ -v
 
 # By category
@@ -266,6 +263,15 @@ export DATABASE_URL=postgresql+asyncpg://dl_user:dl_pass@localhost:5432/dl_origi
 uvicorn app.main:app --reload
 ```
 
+### Frontend Development
+
+```bash
+cd frontend
+npm install
+npm run dev         # Vite dev server on http://localhost:5173 (proxies /api to :8000)
+npm run build       # Build to frontend/dist/ (served by FastAPI in Docker)
+```
+
 ### Database Migrations
 
 ```bash
@@ -276,6 +282,10 @@ DATABASE_URL=postgresql+asyncpg://dl_user:dl_pass@localhost:5432/dl_origination 
 # Generate a new migration after ORM changes
 DATABASE_URL=postgresql+asyncpg://dl_user:dl_pass@localhost:5432/dl_origination \
   alembic revision --autogenerate -m "description"
+
+# Current migrations:
+# 0001 — Initial schema (8 tables)
+# 0002 — Add enrichment status columns (bizapi_status, ciq_status, bizapi_duns, ciq_entity_id)
 ```
 
 ### Lint

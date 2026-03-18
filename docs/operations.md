@@ -21,19 +21,37 @@ cp .env.example .env
 ### Option A: Docker Compose (recommended)
 
 ```bash
+# Build and start frontend first (if not already built)
+cd frontend && npm install && npm run build && cd ..
+
 docker compose up --build
 ```
+
+Open **http://localhost:8000** in your browser to access the full UI.
 
 This starts 4 services:
 
 | Service | Port | Description |
 |---|---|---|
-| `api` | 8000 | FastAPI with hot-reload |
+| `api` | 8000 | FastAPI with hot-reload + serves React frontend |
 | `worker` | — | ARQ background job worker |
 | `db` | 5432 | PostgreSQL 16 |
 | `redis` | 6379 | Redis 7 |
 
-Volumes mount `./app`, `./profiles`, and `./data` for live editing.
+Volumes mount `./app`, `./profiles`, `./data`, and `./frontend/dist` for live editing.
+
+**Important:** The `api` service serves the pre-built React frontend from `frontend/dist/`. The `SERVE_FRONTEND=true` environment variable enables this. If you see a blank page, ensure the frontend has been built (`npm run build` in `frontend/`).
+
+#### Resetting the database
+
+If you encounter schema errors (e.g., "column does not exist") after code changes:
+
+```bash
+docker compose down -v    # -v removes the PostgreSQL data volume
+docker compose up
+```
+
+`Base.metadata.create_all()` runs on startup and recreates all tables. Note: this destroys all existing data.
 
 ### Option B: Local Python + Docker services
 
@@ -77,7 +95,7 @@ pytest tests/ --cov=app --cov-report=term-missing
 pytest tests/test_pipeline/ -v
 ```
 
-All 303 tests run with mock providers — no external services required.
+All 302 tests run with mock providers — no external services required.
 
 ### Test Categories
 
@@ -123,6 +141,31 @@ dl-origination review resolve --item-id <id> --decision merge
 dl-origination export --run-id <id> --format excel
 ```
 
+### Frontend Development
+
+```bash
+cd frontend
+npm install
+npm run dev         # Vite dev server on http://localhost:5173
+npm run build       # Production build to frontend/dist/
+npm run lint        # ESLint check
+```
+
+**Dev mode:** The Vite dev server proxies `/api` requests to `http://localhost:8000`, so you need the FastAPI backend running separately. Use this for frontend development with hot-reload.
+
+**Production mode:** Run `npm run build`, then start Docker Compose. The FastAPI server serves the built assets from `frontend/dist/`.
+
+**Tech stack:**
+- React 19 + TypeScript 5.9
+- Vite 6.4 (build tool)
+- Tailwind CSS 4 (styling)
+- Radix UI primitives (accessible components)
+- TanStack Query 5 (server state / API caching)
+- TanStack Table 8 (data tables with sorting/filtering)
+- Zustand 5 (client state management)
+- React Router 7 (SPA routing)
+- Lucide React (icons)
+
 ---
 
 ## Environment Variables
@@ -136,6 +179,7 @@ All settings are loaded from `.env` via Pydantic Settings.
 | `DATABASE_URL` | `postgresql+asyncpg://...@db:5432/dl_origination` | Async SQLAlchemy connection string |
 | `REDIS_URL` | `redis://redis:6379/0` | Redis URL for ARQ job queue |
 | `AUTH_ENABLED` | `false` | Enable authentication boundary |
+| `SERVE_FRONTEND` | `true` | Serve React frontend from `frontend/dist/` |
 | `STORAGE_BACKEND` | `local` | `local` or `s3` |
 | `STORAGE_PATH` | `./data` | Local storage directory |
 
@@ -265,7 +309,7 @@ pitchbook_enrichment_failed    company=... error=...
 The project includes Alembic for schema migrations. The `DATABASE_URL` env var overrides the default URL in `alembic.ini`:
 
 ```bash
-# Apply the initial migration (creates all tables)
+# Apply all migrations
 DATABASE_URL=postgresql+asyncpg://dl_user:dl_pass@localhost:5432/dl_origination \
   alembic upgrade head
 
@@ -276,6 +320,15 @@ DATABASE_URL=postgresql+asyncpg://dl_user:dl_pass@localhost:5432/dl_origination 
 # Check current version
 alembic current
 ```
+
+**Current migrations:**
+
+| Revision | Description |
+|---|---|
+| `0001` | Initial schema — 8 tables (runs, companies, theme_recommendations, source_recommendations, checkpoints, review_queue, export_manifests, company_evidence) |
+| `0002` | Add enrichment status columns — `bizapi_status`, `ciq_status`, `bizapi_duns`, `ciq_entity_id` on companies table |
+
+**Note:** In Docker dev mode, `Base.metadata.create_all()` runs on startup and creates all tables from the ORM models. This only creates missing tables — it does **not** add columns to existing tables. If you change the ORM model, either run `alembic upgrade head` or reset the database with `docker compose down -v`.
 
 ### Scaling Considerations
 

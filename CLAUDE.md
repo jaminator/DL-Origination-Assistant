@@ -3,7 +3,7 @@
 Production FastAPI direct-lending origination platform. Two engines
 (Recommender + Miner) share a Platform Layer backed by PostgreSQL
 (asyncpg), Redis (ARQ), and an AI Layer (Anthropic Claude + MCP).
-Phase 6.5 complete. 303 tests passing. 0 Ruff violations.
+Phase 7 (Frontend UI) complete. 302 tests passing. 0 Ruff violations.
 ## Tech Stack
 - Python 3.11+
 - FastAPI with create_app() factory + asynccontextmanager lifespan
@@ -11,8 +11,9 @@ Phase 6.5 complete. 303 tests passing. 0 Ruff violations.
   (PostgreSQL-native UUID / SQLite String portable), AsyncSession,
   async_sessionmaker(expire_on_commit=False)
 - asyncpg driver → PostgreSQL
-- Alembic: 0001_initial_schema.py (8 tables), env.py supports
-  DATABASE_URL env var override, run_sync for async engine
+- Alembic: 0001_initial_schema.py (8 tables),
+  0002_add_enrichment_status_columns.py (4 columns on companies),
+  env.py supports DATABASE_URL env var override, run_sync for async engine
 - ARQ background jobs + inline async fallback (app/platform/jobs/)
 - Pydantic v2: ConfigDict, model_validator, SecretStr, Pydantic Settings
   All enums use StrEnum (migrated from (str, Enum) — do not revert)
@@ -27,8 +28,15 @@ Phase 6.5 complete. 303 tests passing. 0 Ruff violations.
 - structlog structured logging (app/platform/utils/logging.py)
 - Ruff: 0 violations. ruff check app/ tests/ is the lint command.
 - Typer + Rich CLI (app/cli.py)
-- pytest + pytest-asyncio asyncio_mode=auto (303 tests, 16 categories)
+- pytest + pytest-asyncio asyncio_mode=auto (302 tests, 16 categories)
 - Docker Compose: api, db, redis, worker (4 services)
+  api serves both backend API and frontend static assets
+- React 19 + TypeScript + Vite frontend (frontend/)
+  Radix UI primitives, Tailwind CSS 4, TanStack Query + Table,
+  Zustand state, React Router 7, Lucide icons
+  10 pages: Dashboard, RunSetup, SubVerticals, Sources, Pipeline,
+  Companies, CompanyDetail, ReviewQueue, Exports, Settings
+  Built assets served by FastAPI via SERVE_FRONTEND=true
 - Multi-format export: CSV, JSONL, 4-sheet Excel
   (outreach, capital structure, enrichment sources tabs)
 ## Enrichment Providers (4 total)
@@ -87,15 +95,31 @@ mega_cap, geography, score_sanity (total_score > 95 = data error)
   record. State machine: pending→auto_accepted→human_accepted/rejected.
 - Cross-source conflicts (revenue >50% divergence, ownership disagreement)
   MUST route to review queue, not silently resolve.
+## MockLLMService Prompt Detection (app/ai/llm_service.py)
+MockLLMService returns different fixtures based on prompt keywords:
+1. "enrichment data" or "research the following company" → web enrichment fixture
+2. User-registered fixtures via register_fixture(key, response)
+3. "recommend data sources" → source discovery fixture (4 sources + 2 NAICS)
+4. Default → subvertical recommendation fixture
+Order matters: registered fixtures take priority over built-in detection.
+## Frontend Architecture (frontend/)
+- Vite dev server proxies /api to FastAPI backend (vite.config.ts)
+- Production: `npm run build` → dist/ mounted into Docker container
+- FastAPI serves dist/ via StaticFiles + SPA catch-all route
+- Docker volume: ./frontend/dist:/app/frontend/dist
+- TanStack Query handles server state with smart polling intervals
+  (Pipeline page: 2s for run status, 5s for checkpoints while running)
+- Zustand manages client state (useStore.ts)
+- All API calls through frontend/src/lib/api.ts
 ## Known Stubs (do not break stub interfaces)
-- MCPPitchBookClient: all methods raise NotImplementedError (Phase 7)
+- MCPPitchBookClient: all methods raise NotImplementedError (Phase 8)
 - WebScraperAdapter/DirectoryAdapter: retry logic complete, no real URLs
 - ARQ worker: config exists, requires Redis to activate
 - Auth boundary: get_current_user returns dummy, AUTH_ENABLED flag exists
 - S3Storage: interface defined, not implemented
 - ResearchOrchestrator: batch/retry framework, no real connectors
 ## Test Commands
-pytest tests/ -v                          # full 303-test suite
+pytest tests/ -v                          # full 302-test suite
 pytest tests/test_smoke/                  # import/config smoke
 pytest tests/test_integration/            # DB + LLM + API flow (49 tests)
 pytest tests/test_pipeline/              # full 12-stage pipeline
@@ -109,3 +133,8 @@ mypy app/ --strict --ignore-missing-imports
 - All 11 enums are StrEnum — never revert to (str, Enum)
 - expire_on_commit=False is REQUIRED on async_sessionmaker
 - LLM_PROVIDER=mock forces MockLLMService in all test fixtures
+- SERVE_FRONTEND=true enables static file serving from frontend/dist
+- Docker dev: `docker compose down -v` to reset DB when ORM changes
+  (create_all() only creates tables, does not add columns to existing ones)
+- Alembic migration 0002 adds bizapi_status, ciq_status, bizapi_duns,
+  ciq_entity_id to companies table (must be present for pipeline to work)
