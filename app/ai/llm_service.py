@@ -245,6 +245,68 @@ class MockLLMService(LLMService):
                 }
             ]
         }
+        self._source_response = {
+            "sources": [
+                {
+                    "source_name": "ENR Top 500 Design Firms",
+                    "source_type": "ranking_list",
+                    "url": "https://www.enr.com/toplists",
+                    "mapped_subverticals": ["Mock Sub-vertical"],
+                    "rationale": "Comprehensive ranking of engineering and design firms by revenue",
+                    "expected_company_type": "Engineering & design services",
+                    "expected_data_quality": "high",
+                    "access_type": "public_scrape",
+                    "recommendation_priority": "core",
+                },
+                {
+                    "source_name": "IBISWorld Industry Reports",
+                    "source_type": "trade_journal",
+                    "url": "https://www.ibisworld.com",
+                    "mapped_subverticals": ["Mock Sub-vertical"],
+                    "rationale": "Detailed industry analysis with company lists and market share data",
+                    "expected_company_type": "Various middle-market companies",
+                    "expected_data_quality": "high",
+                    "access_type": "login_required",
+                    "recommendation_priority": "core",
+                },
+                {
+                    "source_name": "ABC Association Member Directory",
+                    "source_type": "association_directory",
+                    "url": "https://www.abc.org/members",
+                    "mapped_subverticals": ["Mock Sub-vertical"],
+                    "rationale": "Trade association with verified member company listings",
+                    "expected_company_type": "Specialty contractors and service providers",
+                    "expected_data_quality": "medium",
+                    "access_type": "public_manual",
+                    "recommendation_priority": "useful",
+                },
+                {
+                    "source_name": "Industry Conference Exhibitors 2025",
+                    "source_type": "conference_exhibitor",
+                    "url": None,
+                    "mapped_subverticals": ["Mock Sub-vertical"],
+                    "rationale": "Annual conference exhibitor list reveals active companies in the space",
+                    "expected_company_type": "Mid-market vendors and service providers",
+                    "expected_data_quality": "medium",
+                    "access_type": "public_scrape",
+                    "recommendation_priority": "useful",
+                },
+            ],
+            "naics_codes": [
+                {
+                    "code": "541330",
+                    "description": "Engineering Services",
+                    "mapped_subverticals": ["Mock Sub-vertical"],
+                    "relevance_explanation": "Primary NAICS code for engineering services firms",
+                },
+                {
+                    "code": "541512",
+                    "description": "Computer Systems Design Services",
+                    "mapped_subverticals": ["Mock Sub-vertical"],
+                    "relevance_explanation": "Covers IT infrastructure and systems design firms",
+                },
+            ],
+        }
         # Pre-register web enrichment fixture for mock company enrichment
         self._web_enrichment_response = {
             "description": "Mock company providing specialized services",
@@ -287,6 +349,11 @@ class MockLLMService(LLMService):
             if key.lower() in prompt.lower():
                 content = json.dumps(fixture) if isinstance(fixture, (dict, list)) else str(fixture)
                 return LLMResponse(content=content, model="mock", provider="mock")
+
+        # Detect source discovery prompts and return source fixture
+        if "recommend data sources" in prompt.lower():
+            content = json.dumps(self._source_response)
+            return LLMResponse(content=content, model="mock", provider="mock")
 
         content = json.dumps(self._default_response)
         return LLMResponse(content=content, model="mock", provider="mock")
