@@ -31,7 +31,11 @@ Dispositioning assigns each company a classification that determines its role in
 5. Revenue below floor
    IF revenue < $5M → EXCLUDE
 
-6. Default → PRIMARY
+6. Boundary zone (when boundary_treatment = "watch")
+   IF revenue $5M-$10M (near floor) → WATCH
+   IF revenue > 90% of cascade_anchor_threshold (near ceiling) → WATCH
+
+7. Default → PRIMARY
 ```
 
 **Key design choice**: The mega-cap check runs *before* cascade anchor. Public companies with revenue > $5B are never useful as cascade anchors because their competitor sets are too broad and well-known.
@@ -184,7 +188,7 @@ Two-pass deduplication using RapidFuzz:
 
 Dedup runs twice:
 - After Stage 2 (name normalization) — across source extractions
-- At Stage 7 (final dedup) — including cascade-expansion additions
+- At Stage 9 (final dedup) — including cascade-expansion additions
 
 ---
 

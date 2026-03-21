@@ -95,7 +95,10 @@ pytest tests/ --cov=app --cov-report=term-missing
 pytest tests/test_pipeline/ -v
 ```
 
-All 302 tests run with mock providers — no external services required.
+All 316 tests run with mock providers — no external services required.
+
+> **Note:** The skipped `test_full_workflow_through_execute` test is an environment issue
+> (broken system `cryptography` lib blocking Redis/ARQ import chain), not a code defect.
 
 ### Test Categories
 
@@ -153,7 +156,9 @@ npm run lint        # ESLint check
 
 **Dev mode:** The Vite dev server proxies `/api` requests to `http://localhost:8000`, so you need the FastAPI backend running separately. Use this for frontend development with hot-reload.
 
-**Production mode:** Run `npm run build`, then start Docker Compose. The FastAPI server serves the built assets from `frontend/dist/`.
+**Production mode:** Run `npm run build`, then start Docker Compose. The FastAPI server serves the built assets from `frontend/dist/` when `SERVE_FRONTEND=true` is set (the default in Docker Compose). The SPA catch-all route in `app/main.py` ensures React Router paths return `index.html` instead of 404.
+
+For detailed frontend architecture, see [Frontend Guide](frontend.md).
 
 **Tech stack:**
 - React 19 + TypeScript 5.9
@@ -197,7 +202,7 @@ All settings are loaded from `.env` via Pydantic Settings.
 
 | Variable | Default | Description |
 |---|---|---|
-| `PITCHBOOK_PROVIDER` | `mock` | `mock` for local dev, `rest` or `mcp` for production |
+| `PITCHBOOK_PROVIDER` | `mock` | `mock` for local dev, `rest` for production (`mcp` stubbed — not functional) |
 | `PITCHBOOK_API_BASE_URL` | `https://api.pitchbook.com/v2` | PitchBook REST API base URL |
 | `PITCHBOOK_API_KEY` | (empty) | PitchBook API key (when `rest`) |
 | `PITCHBOOK_API_TIMEOUT` | `30.0` | Per-request timeout in seconds |
@@ -244,9 +249,8 @@ services:
     environment:
       LLM_PROVIDER: claude
       LLM_API_KEY: ${LLM_API_KEY}
-      PITCHBOOK_PROVIDER: mcp
-      MCP_PITCHBOOK_URL: ${MCP_PITCHBOOK_URL}
-      MCP_PITCHBOOK_TOKEN: ${MCP_PITCHBOOK_TOKEN}
+      PITCHBOOK_PROVIDER: rest
+      PITCHBOOK_API_KEY: ${PITCHBOOK_API_KEY}
       AUTH_ENABLED: "true"
 ```
 
@@ -328,7 +332,11 @@ alembic current
 | `0001` | Initial schema — 8 tables (runs, companies, theme_recommendations, source_recommendations, checkpoints, review_queue, export_manifests, company_evidence) |
 | `0002` | Add enrichment status columns — `bizapi_status`, `ciq_status`, `bizapi_duns`, `ciq_entity_id` on companies table |
 
-**Note:** In Docker dev mode, `Base.metadata.create_all()` runs on startup and creates all tables from the ORM models. This only creates missing tables — it does **not** add columns to existing tables. If you change the ORM model, either run `alembic upgrade head` or reset the database with `docker compose down -v`.
+> **`create_all()` does not add columns to existing tables.** If ORM models change,
+> run `docker compose down -v` to reset the database before `docker compose up`.
+> Generate a new Alembic migration for any schema changes.
+
+In Docker dev mode, `Base.metadata.create_all()` runs on startup and creates all tables from the ORM models. This only creates missing tables — it does **not** add columns to existing tables. If you change the ORM model, either run `alembic upgrade head` or reset the database with `docker compose down -v`.
 
 ### Scaling Considerations
 
@@ -376,9 +384,10 @@ Create `profiles/your_industry.yaml` with:
 
 ### Connecting Real PitchBook
 
-1. Set `PITCHBOOK_PROVIDER=rest` in `.env` (or `mcp` for MCP server)
-2. For REST: set `PITCHBOOK_API_KEY`
-3. For MCP: set `MCP_PITCHBOOK_URL` and `MCP_PITCHBOOK_TOKEN`, implement tool calls in `app/miner/pitchbook/mcp_client.py`
+1. Set `PITCHBOOK_PROVIDER=rest` in `.env`
+2. Set `PITCHBOOK_API_KEY`
+
+See [PitchBook Integration](integrations/pitchbook.md) for full details. MCP mode is stubbed and not functional.
 
 ### Connecting Real BizAPI
 

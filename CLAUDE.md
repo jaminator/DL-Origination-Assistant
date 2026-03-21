@@ -3,7 +3,7 @@
 Production FastAPI direct-lending origination platform. Two engines
 (Recommender + Miner) share a Platform Layer backed by PostgreSQL
 (asyncpg), Redis (ARQ), and an AI Layer (Anthropic Claude + MCP).
-Phase 7 (Frontend UI) complete. 302 tests passing. 0 Ruff violations.
+Phase 7 (Frontend UI) complete. 316 tests passing. 0 Ruff violations.
 ## Tech Stack
 - Python 3.11+
 - FastAPI with create_app() factory + asynccontextmanager lifespan
@@ -28,7 +28,7 @@ Phase 7 (Frontend UI) complete. 302 tests passing. 0 Ruff violations.
 - structlog structured logging (app/platform/utils/logging.py)
 - Ruff: 0 violations. ruff check app/ tests/ is the lint command.
 - Typer + Rich CLI (app/cli.py)
-- pytest + pytest-asyncio asyncio_mode=auto (302 tests, 16 categories)
+- pytest + pytest-asyncio asyncio_mode=auto (316 tests, 16 categories)
 - Docker Compose: api, db, redis, worker (4 services)
   api serves both backend API and frontend static assets
 - React 19 + TypeScript + Vite frontend (frontend/)
@@ -71,7 +71,9 @@ Stage 12: export                — CSV + JSONL + 4-sheet Excel
 3. revenue > cascade_anchor_threshold ($1B)    → CASCADE_ANCHOR
 4. revenue > revenue_ceiling ($1B)             → CASCADE_ANCHOR
 5. revenue < $5M                               → EXCLUDE
-6. default                                     → PRIMARY
+6. boundary_treatment="watch" AND near floor/ceiling → WATCH
+   (revenue $5M-$10M OR revenue > 90% of cascade_anchor_threshold)
+7. default                                     → PRIMARY
 ## Scoring Formula (deterministic, 0-100, partial credit for missing data)
 Revenue Scale:      weight 20  (sweet spot $50M-$500M → 90 raw)
 EBITDA Margin:      weight 15  (>= 20% → 95 raw)
@@ -119,7 +121,7 @@ Order matters: registered fixtures take priority over built-in detection.
 - S3Storage: interface defined, not implemented
 - ResearchOrchestrator: batch/retry framework, no real connectors
 ## Test Commands
-pytest tests/ -v                          # full 302-test suite
+pytest tests/ -v                          # full 316-test suite
 pytest tests/test_smoke/                  # import/config smoke
 pytest tests/test_integration/            # DB + LLM + API flow (49 tests)
 pytest tests/test_pipeline/              # full 12-stage pipeline
