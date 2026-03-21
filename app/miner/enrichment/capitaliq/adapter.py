@@ -1,4 +1,10 @@
-"""Abstract Capital IQ adapter interface for private-market financial enrichment."""
+"""Abstract Capital IQ adapter interface for private-market financial enrichment.
+
+Capital IQ uses the SPQL (S&P Query Language) paradigm — all data is fetched
+via POST requests with ``inputRequests`` arrays specifying mnemonics (e.g.
+``IQ_TOTAL_REV``, ``IQ_EBITDA``, ``IQ_COMPANY_NAME``).  The adapter methods
+abstract over this, presenting a clean interface to the pipeline.
+"""
 
 from abc import ABC, abstractmethod
 
@@ -31,6 +37,14 @@ class CapitalIQAdapter(ABC):
         """Get ownership and investor data.
 
         Returns ownership type, key investors, and M&A history.
+        """
+        ...
+
+    @abstractmethod
+    async def get_company_profile(self, entity_id: str) -> dict:
+        """Get company profile data (industry, status, classification).
+
+        Returns GICS code, SIC code, company status, and industry sector.
         """
         ...
 

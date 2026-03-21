@@ -42,5 +42,14 @@ async def test_get_ownership(client):
     assert len(result["ma_history"]) > 0
 
 
+async def test_get_company_profile(client):
+    result = await client.get_company_profile("ciq-12345678")
+    assert result["entity_id"] == "ciq-12345678"
+    assert result["gics_code"] == "45101010"
+    assert result["sic_code"] == "7372"
+    assert result["company_status"] == "Operating"
+    assert result["industry_sector"] == "Information Technology"
+
+
 async def test_is_available(client):
     assert await client.is_available() is True

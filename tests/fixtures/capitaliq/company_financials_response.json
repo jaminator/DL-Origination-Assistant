@@ -1,12 +1,39 @@
 {
-  "CompanyId": "ciq-12345678",
-  "TotalRevenue": 80.0,
-  "EBITDA": 16.0,
-  "TotalDebt": 45.0,
-  "NetDebt": 38.0,
-  "CreditMetrics": {
-    "TotalLeverage": 2.8,
-    "NetLeverage": 2.4,
-    "InterestCoverage": 4.5
-  }
+  "GDSSDKResponse": [
+    {
+      "Identifier": "IQ12345678",
+      "Mnemonic": "IQ_TOTAL_REV",
+      "Rows": [{"Row": ["80.0"]}]
+    },
+    {
+      "Identifier": "IQ12345678",
+      "Mnemonic": "IQ_EBITDA",
+      "Rows": [{"Row": ["16.0"]}]
+    },
+    {
+      "Identifier": "IQ12345678",
+      "Mnemonic": "IQ_TOTAL_DEBT",
+      "Rows": [{"Row": ["45.0"]}]
+    },
+    {
+      "Identifier": "IQ12345678",
+      "Mnemonic": "IQ_NET_DEBT",
+      "Rows": [{"Row": ["38.0"]}]
+    },
+    {
+      "Identifier": "IQ12345678",
+      "Mnemonic": "IQ_TOTAL_LEVERAGE",
+      "Rows": [{"Row": ["2.8"]}]
+    },
+    {
+      "Identifier": "IQ12345678",
+      "Mnemonic": "IQ_NET_LEVERAGE",
+      "Rows": [{"Row": ["2.4"]}]
+    },
+    {
+      "Identifier": "IQ12345678",
+      "Mnemonic": "IQ_INTEREST_COVERAGE",
+      "Rows": [{"Row": ["4.5"]}]
+    }
+  ]
 }

@@ -46,5 +46,14 @@ class MockCapitalIQClient(CapitalIQAdapter):
             ],
         }
 
+    async def get_company_profile(self, entity_id: str) -> dict:
+        return {
+            "entity_id": entity_id,
+            "gics_code": "45101010",
+            "sic_code": "7372",
+            "company_status": "Operating",
+            "industry_sector": "Information Technology",
+        }
+
     async def is_available(self) -> bool:
         return True

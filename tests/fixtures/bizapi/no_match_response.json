@@ -1,3 +1,15 @@
 {
-  "MatchFound": false
+  "Search Terms": {
+    "companyName": "Nonexistent Corp",
+    "state": "TX"
+  },
+  "Matching Data": {
+    "Request ID": 475,
+    "Layout": "PL",
+    "Matches Remaining": 224341,
+    "Match Method": ""
+  },
+  "Appended Data": {
+    "Message": "No match found"
+  }
 }
