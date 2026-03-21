@@ -40,10 +40,10 @@ class Settings(BaseSettings):
     bizapi_max_retries: int = 3
     bizapi_rate_limit_rps: float = 3.0
 
-    # S&P Capital IQ
+    # S&P Capital IQ (GDS SPQL API)
     capitaliq_provider: str = "mock"  # "rest" or "mock"
-    capitaliq_api_url: str = ""
-    capitaliq_api_key: SecretStr = SecretStr("")
+    capitaliq_api_url: str = "https://api-ciq.marketintelligence.spglobal.com/gdsapi/rest"
+    capitaliq_api_key: SecretStr = SecretStr("")  # Bearer token for SPQL auth
     capitaliq_timeout: float = 30.0
     capitaliq_max_retries: int = 3
     capitaliq_skip_if_pb_complete: bool = True

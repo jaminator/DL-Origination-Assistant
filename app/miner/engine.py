@@ -569,6 +569,13 @@ class MinerEngine:
                     company.ciq_net_debt = financials.get("net_debt")
                     company.ciq_credit_metrics = financials.get("credit_metrics")
 
+                    # Get company profile (GICS, SIC, status, sector)
+                    profile = await self._capitaliq.get_company_profile(company.ciq_entity_id)
+                    company.ciq_gics_code = profile.get("gics_code")
+                    company.ciq_sic_code = profile.get("sic_code")
+                    company.ciq_company_status = profile.get("company_status")
+                    company.ciq_industry_sector = profile.get("industry_sector")
+
                     # Get ownership
                     ownership = await self._capitaliq.get_ownership(company.ciq_entity_id)
                     company.ciq_ownership_type = ownership.get("ownership_type")

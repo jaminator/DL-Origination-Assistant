@@ -1,13 +1,29 @@
 {
-  "Results": [
+  "GDSSDKResponse": [
     {
-      "CompanyId": "ciq-12345678",
-      "CompanyName": "Acme Solutions Inc",
-      "PrimaryIndustry": "Application Software",
-      "City": "Dallas",
-      "State": "TX",
-      "Country": "US",
-      "MatchScore": 88
+      "Identifier": "IQ12345678",
+      "Mnemonic": "IQ_COMPANY_NAME",
+      "Rows": [{"Row": ["Acme Solutions Inc"]}]
+    },
+    {
+      "Identifier": "IQ12345678",
+      "Mnemonic": "IQ_PRIMARY_INDUSTRY",
+      "Rows": [{"Row": ["Application Software"]}]
+    },
+    {
+      "Identifier": "IQ12345678",
+      "Mnemonic": "IQ_COMPANY_CITY",
+      "Rows": [{"Row": ["Dallas"]}]
+    },
+    {
+      "Identifier": "IQ12345678",
+      "Mnemonic": "IQ_COMPANY_STATE",
+      "Rows": [{"Row": ["TX"]}]
+    },
+    {
+      "Identifier": "IQ12345678",
+      "Mnemonic": "IQ_COMPANY_COUNTRY",
+      "Rows": [{"Row": ["US"]}]
     }
   ]
 }

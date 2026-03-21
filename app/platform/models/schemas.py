@@ -174,6 +174,10 @@ class CompanyRecord(BaseModel):
     ciq_key_investors: list[str] = Field(default_factory=list)
     ciq_ma_history: list[dict] = Field(default_factory=list)
     ciq_credit_metrics: dict | None = None
+    ciq_gics_code: str | None = None
+    ciq_sic_code: str | None = None
+    ciq_company_status: str | None = None  # e.g. "Operating" / "Operating Subsidiary"
+    ciq_industry_sector: str | None = None
 
     # Scoring
     total_score: float | None = None
