@@ -1,14 +1,19 @@
-"""PitchBook REST API v2 client.
+"""PitchBook Premium Data API v2 client.
 
 Implements the PitchBookAdapter interface using PitchBook's RESTful API v2.
 
-Authentication: API key passed as ``Authorization`` header (or via ``PB-API-Key``
-header, depending on provisioning).  The base URL and key are sourced from
-application settings.
+Authentication: Bearer token passed as ``Authorization`` header.  The base
+URL and key are sourced from application settings.
 
 Reference:
-    PitchBook API v2 docs — https://documenter.getpostman.com/view/5190535/TzCV1iRc
-    PitchBook Direct Data — https://pitchbook.com/products/direct-access-data/api
+    PitchBook Premium Data API v2 — company endpoints:
+      GET /companies/search                          — keyword search
+      GET /companies/{pbId}/bio                      — company bio
+      GET /companies/{pbId}/financials               — private financials
+      GET /companies/{pbId}/deals                    — deal history
+      GET /companies/{pbId}/similar-companies        — similar companies
+      GET /companies/{pbId}/most-recent-debt-financing — latest debt facility
+      GET /companies/{pbId}/active-investors         — current investors
 """
 
 from __future__ import annotations
@@ -24,23 +29,17 @@ from app.platform.utils.logging import get_logger
 
 logger = get_logger("miner.pitchbook.rest")
 
-# PitchBook API v2 entity type path segments
-_ENTITY_COMPANIES = "companies"
-_ENTITY_DEALS = "deals"
-_ENTITY_INVESTORS = "investors"
-_ENTITY_FUNDS = "funds"
-
 # Default pagination
 _DEFAULT_PAGE_SIZE = 25
 
 
 class PitchBookRESTClient(PitchBookAdapter):
-    """PitchBook integration via REST API v2.
+    """PitchBook integration via Premium Data REST API v2.
 
     The PitchBook API v2 is a RESTful JSON API.  Entity types include
     companies, deals, investors, funds, people, limited partners, and
     service providers.  Each entity type has search and detail endpoints,
-    plus relational sub-endpoints (e.g. ``/companies/{id}/deals``).
+    plus relational sub-endpoints (e.g. ``/companies/{pbId}/deals``).
     """
 
     def __init__(
@@ -150,20 +149,18 @@ class PitchBookRESTClient(PitchBookAdapter):
     # -- PitchBookAdapter interface ---------------------------------------
 
     async def search_company(self, company_name: str) -> dict | None:
-        """Search PitchBook companies by name.
+        """Search PitchBook companies by keyword.
 
-        PitchBook API v2 endpoint: ``GET /companies``
+        PitchBook API v2 endpoint: ``GET /companies/search``
 
         Query params:
-            name (str): Company name to search for.
+            keywords (str): Company name to search for.
             pageSize (int): Results per page (default 25).
-
-        Returns the best match (first result) or None.
         """
         data = await self._request(
             "GET",
-            f"/{_ENTITY_COMPANIES}",
-            params={"name": company_name, "pageSize": 5},
+            "/companies/search",
+            params={"keywords": company_name, "pageSize": 5},
         )
         items = data.get("items", data.get("results", []))
         if not items:
@@ -174,46 +171,42 @@ class PitchBookRESTClient(PitchBookAdapter):
         return _normalize_company_search_result(best, company_name)
 
     async def get_company_detail(self, entity_id: str) -> dict:
-        """Get full company profile.
+        """Get company bio.
 
-        PitchBook API v2 endpoint: ``GET /companies/{companyId}``
+        PitchBook API v2 endpoint: ``GET /companies/{pbId}/bio``
 
-        Returns company overview, financials, ownership, and classification.
+        Returns company overview, ownership, financing status, and classification.
         """
-        data = await self._request("GET", f"/{_ENTITY_COMPANIES}/{entity_id}")
-        return _normalize_company_detail(data)
+        data = await self._request("GET", f"/companies/{entity_id}/bio")
+        return _normalize_company_bio(data)
 
     async def get_competitors(self, entity_id: str) -> list[dict]:
-        """Get competitor / similar companies.
+        """Get similar companies (includes competitors).
 
-        PitchBook API v2 endpoint: ``GET /companies/{companyId}/competitors``
-
-        Returns list of competitor company summaries.
+        PitchBook API v2 endpoint: ``GET /companies/{pbId}/similar-companies``
         """
         try:
             data = await self._request(
                 "GET",
-                f"/{_ENTITY_COMPANIES}/{entity_id}/competitors",
+                f"/companies/{entity_id}/similar-companies",
                 params={"pageSize": _DEFAULT_PAGE_SIZE},
             )
             items = data.get("items", data.get("results", []))
-            return [_normalize_competitor(c) for c in items]
+            return [_normalize_similar_company(c) for c in items]
         except Exception as exc:
-            logger.warning("pitchbook_competitors_failed", entity_id=entity_id, error=str(exc))
+            logger.warning("pitchbook_similar_companies_failed", entity_id=entity_id, error=str(exc))
             return []
 
     async def get_debt_details(self, entity_id: str) -> list[dict]:
         """Get debt / capital structure details.
 
-        PitchBook API v2 endpoint: ``GET /companies/{companyId}/deals``
+        PitchBook API v2 endpoint: ``GET /companies/{pbId}/deals``
         filtered by deal type = debt/credit.
-
-        Returns list of debt facility summaries.
         """
         try:
             data = await self._request(
                 "GET",
-                f"/{_ENTITY_COMPANIES}/{entity_id}/deals",
+                f"/companies/{entity_id}/deals",
                 params={
                     "dealType": "Debt",
                     "pageSize": _DEFAULT_PAGE_SIZE,
@@ -223,6 +216,74 @@ class PitchBookRESTClient(PitchBookAdapter):
             return [_normalize_debt_deal(d) for d in items]
         except Exception as exc:
             logger.warning("pitchbook_debt_failed", entity_id=entity_id, error=str(exc))
+            return []
+
+    async def get_financials(self, entity_id: str) -> dict | None:
+        """Get private company financials.
+
+        PitchBook API v2 endpoint: ``GET /companies/{pbId}/financials``
+        """
+        try:
+            data = await self._request("GET", f"/companies/{entity_id}/financials")
+            return _normalize_financials(data)
+        except Exception as exc:
+            logger.warning("pitchbook_financials_failed", entity_id=entity_id, error=str(exc))
+            return None
+
+    async def get_most_recent_debt_financing(self, entity_id: str) -> dict | None:
+        """Get most recent debt financing details.
+
+        PitchBook API v2 endpoint: ``GET /companies/{pbId}/most-recent-debt-financing``
+        """
+        try:
+            data = await self._request(
+                "GET", f"/companies/{entity_id}/most-recent-debt-financing"
+            )
+            return _normalize_debt_financing(data)
+        except Exception as exc:
+            logger.warning(
+                "pitchbook_debt_financing_failed", entity_id=entity_id, error=str(exc)
+            )
+            return None
+
+    async def get_active_investors(self, entity_id: str) -> list[dict]:
+        """Get current active investors.
+
+        PitchBook API v2 endpoint: ``GET /companies/{pbId}/active-investors``
+        """
+        try:
+            data = await self._request(
+                "GET",
+                f"/companies/{entity_id}/active-investors",
+                params={"pageSize": _DEFAULT_PAGE_SIZE},
+            )
+            items = data.get("items", data.get("results", []))
+            return [_normalize_investor(inv) for inv in items]
+        except Exception as exc:
+            logger.warning(
+                "pitchbook_investors_failed", entity_id=entity_id, error=str(exc)
+            )
+            return []
+
+    async def get_similar_companies(self, entity_id: str) -> list[dict]:
+        """Get similar companies with similarity scores.
+
+        PitchBook API v2 endpoint: ``GET /companies/{pbId}/similar-companies``
+        """
+        try:
+            data = await self._request(
+                "GET",
+                f"/companies/{entity_id}/similar-companies",
+                params={"pageSize": _DEFAULT_PAGE_SIZE},
+            )
+            items = data.get("items", data.get("results", []))
+            return [_normalize_similar_company(c) for c in items]
+        except Exception as exc:
+            logger.warning(
+                "pitchbook_similar_companies_failed",
+                entity_id=entity_id,
+                error=str(exc),
+            )
             return []
 
     async def is_available(self) -> bool:
@@ -237,7 +298,7 @@ class PitchBookRESTClient(PitchBookAdapter):
 def _normalize_company_search_result(raw: dict, query_name: str) -> dict:
     """Normalize a company search hit into the adapter contract."""
     return {
-        "entity_id": raw.get("companyId") or raw.get("entityId") or raw.get("pbId", ""),
+        "entity_id": raw.get("pbId") or raw.get("companyId") or raw.get("entityId", ""),
         "name": raw.get("companyName") or raw.get("name", query_name),
         "match_confidence": _compute_name_confidence(
             query_name,
@@ -255,10 +316,10 @@ def _normalize_company_search_result(raw: dict, query_name: str) -> dict:
     }
 
 
-def _normalize_company_detail(raw: dict) -> dict:
-    """Normalize a full company profile response."""
+def _normalize_company_bio(raw: dict) -> dict:
+    """Normalize a company bio response."""
     return {
-        "entity_id": raw.get("companyId") or raw.get("entityId", ""),
+        "entity_id": raw.get("pbId") or raw.get("companyId") or raw.get("entityId", ""),
         "name": raw.get("companyName") or raw.get("name", ""),
         "description": raw.get("description") or raw.get("businessDescription", ""),
         "founded_year": raw.get("yearFounded") or raw.get("foundedYear"),
@@ -267,8 +328,7 @@ def _normalize_company_detail(raw: dict) -> dict:
         "ownership_type": raw.get("ownershipStatus") or raw.get("ownership", ""),
         "primary_industry": raw.get("primaryIndustrySector") or raw.get("primaryIndustryCode", ""),
         "employees": raw.get("employees") or raw.get("employeeCount"),
-        "revenue": raw.get("revenue") or raw.get("totalRevenue"),
-        "ebitda": raw.get("ebitda"),
+        "financing_status": raw.get("financingStatus", ""),
         "total_raised": raw.get("totalRaised") or raw.get("totalFundingAmount"),
         "investors": [
             _normalize_investor(inv)
@@ -277,17 +337,30 @@ def _normalize_company_detail(raw: dict) -> dict:
         "last_financing_date": raw.get("lastFinancingDate"),
         "last_financing_type": raw.get("lastFinancingDealType"),
         "status": raw.get("companyStatus") or raw.get("status", ""),
+        "also_known_as": raw.get("alsoKnownAs", ""),
+        "sic_codes": raw.get("sicCodes") or raw.get("SICCodes", []),
     }
 
 
-def _normalize_competitor(raw: dict) -> dict:
+# Keep old name as alias for backward compatibility in tests
+_normalize_company_detail = _normalize_company_bio
+
+
+def _normalize_similar_company(raw: dict) -> dict:
+    """Normalize a similar-company result with similarity score."""
     return {
-        "entity_id": raw.get("companyId") or raw.get("entityId", ""),
+        "entity_id": raw.get("pbId") or raw.get("companyId") or raw.get("entityId", ""),
         "name": raw.get("companyName") or raw.get("name", ""),
         "primary_industry": raw.get("primaryIndustrySector", ""),
         "employee_count": raw.get("employees"),
         "hq_location": _format_location(raw),
+        "similarity_score": raw.get("similarityScore"),
+        "is_competitor": raw.get("isCompetitor", False),
     }
+
+
+# Keep old name as alias
+_normalize_competitor = _normalize_similar_company
 
 
 def _normalize_debt_deal(raw: dict) -> dict:
@@ -300,6 +373,33 @@ def _normalize_debt_deal(raw: dict) -> dict:
         "maturity_date": raw.get("maturityDate", ""),
         "pricing": raw.get("pricing") or raw.get("spread", ""),
         "status": raw.get("dealStatus", ""),
+    }
+
+
+def _normalize_financials(raw: dict) -> dict:
+    """Normalize a financials response into canonical fields."""
+    return {
+        "revenue": _safe_float(raw.get("revenue") or raw.get("totalRevenue")),
+        "ebitda": _safe_float(raw.get("ebitda")),
+        "ebit": _safe_float(raw.get("ebit")),
+        "net_income": _safe_float(raw.get("netIncome")),
+        "enterprise_value": _safe_float(raw.get("enterpriseValue") or raw.get("ev")),
+        "total_debt": _safe_float(raw.get("totalDebt")),
+        "net_debt": _safe_float(raw.get("netDebt")),
+    }
+
+
+def _normalize_debt_financing(raw: dict) -> dict:
+    """Normalize a most-recent-debt-financing response."""
+    return {
+        "deal_id": raw.get("dealId", ""),
+        "seniority": raw.get("seniority", ""),
+        "security": raw.get("security", ""),
+        "spread": raw.get("spread", ""),
+        "maturity_date": raw.get("maturityDate", ""),
+        "deal_size": _safe_float(raw.get("dealSize")),
+        "lender": _extract_lender(raw),
+        "close_date": raw.get("closeDate", ""),
     }
 
 
@@ -349,3 +449,13 @@ def _compute_name_confidence(query: str, result: str) -> float:
         return 0.0
     overlap = len(q_tokens & r_tokens)
     return round(overlap / max(len(q_tokens), len(r_tokens)), 2)
+
+
+def _safe_float(val: Any) -> float | None:
+    """Safely convert a value to float, returning None on failure."""
+    if val is None:
+        return None
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return None

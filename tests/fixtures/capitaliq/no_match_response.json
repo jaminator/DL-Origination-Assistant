@@ -1,3 +1,9 @@
 {
-  "Results": []
+  "GDSSDKResponse": [
+    {
+      "Identifier": "",
+      "Mnemonic": "IQ_COMPANY_NAME",
+      "Rows": [{"Row": ["Data Unavailable"]}]
+    }
+  ]
 }

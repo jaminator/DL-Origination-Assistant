@@ -1,0 +1,239 @@
+openapi: 3.0.1
+info:
+  title: Company Intelligence
+  description: |
+    <p>
+      The Company Intelligence dataset contains a robust offering of qualitative data showcasing a range of company auditors, competitor information, public and private firm profiles, company names, summary or detailed business descriptions, alternate address information, contact information, and more. The dataset can be used in conjunction with S&P Capital IQ Fundamentals and other datasets to provide additional company insight for competitive analysis. 
+    </p>
+
+    <p><strong>Note:</strong></p>
+    <ul>
+      <li>Throttling Limit of 1,000,000(Daily) and 500 individual requests per batch is applied for the total number of requests on Production account. </li>
+      <li>Throttling Limit of 24,000(Daily) and 100 individual requests per batch is applied for the total number of requests on Trial account. </li>
+      <li>Access to this service is based on your current subscription. For more information, please contact your account representative or <a href ='mailto:support.api.mi@spglobal.com'>Enterprise API Support team.</a> </li>
+    </ul>
+  termsOfService: https://www.spglobal.com/en/terms-of-use
+  contact:
+    name: Client Support
+    url: https://www.spglobal.com/en/contact-us
+    email: support.api.mi@spglobal.com
+  version: 0.0.2
+servers:
+  - url: https://api-ciq.marketintelligence.spglobal.com/gdsapi/rest
+security:
+  - BearerScheme: [ ]
+paths:
+  /v3/clientservice.json:
+    post:
+      tags:
+        - Company Intelligence
+      summary: This endpoint retrieves Company Information including public and private firm profiles, business descriptions, address information, contact information, and more.
+      description: |
+        S&P Global Market Intelligence offers a simple and flexible query language, **SPQL**, to retrieve data on demand. Our query language streamlines the process of making a request by requiring at most four, pre-defined components in JSON format. This significantly accelerates onboarding for developers and simplifies both implementation and usage.
+
+        **Here is an example of our query language using JSON to retrieve IBM’s end-of-period date for the current fiscal year:**
+
+        ```json
+        {
+          "function": "GDSP",
+          "identifier": "IBM:NYSE",
+          "mnemonic": "IQ_PERIODDATE",
+          "properties": {"periodType": "IQ_FY"}
+        }
+        ```
+
+        Note that SPQL can only be used with the POST method.
+
+        Each component of the SPQL query language is described in detail below:
+
+        - <u>**Function:**</u>  A function enables you to request data in supported formats like a single point-in-time data value (e.g., GDSP) or a historical time series of data values (e.g., GDSHE).   
+            - **GDSP:** Retrieves a single, current or historical point-in-time data value.
+            - **GDSHE:** Retrieves historical time-series data for a single mnemonic over a specified range (period, date, etc.)
+            - **GDSPV:** Retrieves an array of data values for a given date. 
+            - **GDSHV:** Retrieves an array of data values over a historical range (period, date, etc.)
+
+        - <u>**Identifier:**</u>  The API supports a wide range of identifiers for securities, trading items, entities, and other objects, including CUSIP, ISIN, SEDOL, CIQ Company ID, GVKEY, and many others. Available values are CUSIP6_CINS6, CUSIP9_CINS9, ISIN, TICKER, GVKEY, SEDOL, CIQ_ID, ticker:exchange, CIQTradingItemID, RXENTITYID.Prefixes are required for some identifiers to correctly format requests. For example, "IQ" for Company ID, "CSP_" for CUSIP9, and "ticker:" for tickers. For all others, refer to this section of the  [API Developer’s Guide](https://www.support.marketplace.spglobal.com/content/dam/spglobal/mi/en/documents/marketplace/api/guides/spglobalapidevelopersguide.pdf#page=25).
+
+        - <u>**Mnemonic:**</u>  A mnemonic represents a data point. An example for Company Intelligence data is IQ_FISCAL_Y which represents the Fiscal Year. 
+
+        - <u>**Properties:**</u>  Properties allow you to further refine your input request. Note that some properties are mandatory based on the specific mnemonic. Properties differ based on the mnemonic and chosen function. The following information displays all available properties categorized by function: 
+        
+            - **GDSP:** PERIODTYPE, ASOFDATE, RESTATEMENTTYPEID, FILINGMODE, CURRENCYID, FILINGMODE, CURRENCYCONVERSIONMODEID, RANK, CONTRIBUTORID, CONSOLIDATEDFLAG, CURRENCYID 
+            - **GDSHE:** PERIODTYPE, ASOFDATE, RESTATEMENTTYPEID, FILINGMODE, CURRENCYID, CURRENCYCONVERSIONMODEID, STARTRANK, ENDRANK 
+            - **GDSPV:** PERIODTYPE, ASOFDATE, RESTATEMENTTYPEID, FILINGMODE, STARTRANK, ENDRANK
+            - **GDSHV:** PERIODTYPE, ASOFDATE, RESTATEMENTTYPEID, FILINGMODE, STARTRANK, ENDRANK
+
+        For the complete list of data items and compatible properties, refer to the [API Mnemonics List](https://www.support.marketplace.spglobal.com/content/dam/spglobal/mi/en/documents/marketplace/api/reference/combined_data_items_final.xlsx) and sort by the “Company_Intelligence” Fulfilment column. Definitions for specific properties and formatting instructions can be found in the [Properties Matrix](https://www.support.marketplace.spglobal.com/content/dam/spglobal/mi/en/documents/marketplace/api/reference/api-properties-matrix.pdf).
+
+      requestBody:
+        description: >-
+          Following sample requests include the mandatory and a selection of
+          optional filters
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InputRequests'
+            examples:
+              Company Profile:
+                summary: Company Profile
+                description: >-
+                  This query returns company details like name, description, address for a given company identifier.
+                value:
+                  inputRequests:
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_COMPANY_NAME
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_COMPANY_ID
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_BUSINESS_DESCRIPTION
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_COMPANY_STATUS
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_YEAR_FOUNDED
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_COMPANY_ADDRESS
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_COMPANY_PHONE
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_COMPANY_WEBSITE
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_STATE_OF_INC
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_EXCHANGE
+
+
+              Comparable Companies:
+                summary: Comparable Companies
+                description: >-
+                  The query returns a list of pre-selected companies comparable to the subject company.
+                value:
+                  inputRequests:
+                    - function: GDSHE
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_QUICK_COMP
+                      properties:
+                        startRank: 1
+                        endRank: 20
+              Company Dates:
+                summary: Company Dates
+                description: >-
+                  The query returns important date information for a given company like Period Date, Fiscal year, Fiscal quarter, Estimated earnings date etc.
+                value:
+                  inputRequests:
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_PERIODDATE
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_FIN_DATA_SOURCE
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_ABS_PERIOD
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_CAL_Y
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_CAL_Q
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_FISCAL_Y
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_FISCAL_Q
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_EST_NEXT_EARNINGS_DATE
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_ABS_PERIOD_EST
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_FISCAL_Y_EST
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_FISCAL_Q_EST
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_CAL_Y_EST
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_CAL_Q_EST
+              Corporate Hierarchy:
+                summary: Corporate Hierarchy
+                description: >-
+                  The query returns Corporate tree for a given company identifier.
+                value:
+                  inputRequests:
+                    - function: GDSHV
+                      identifier: NVDA:NASDAQGS
+                      mnemonic: IQ_COMPANY_CORP_TREE
+                      properties:
+                        startRank: 1
+                        endRank: 3
+              Industry Classification:
+                summary: Industry Classification
+                description: >-
+                  The query returns industry classification information like GICS code, SIC, NAICS for a given company identifier.
+                value:
+                  inputRequests:
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_PRIMARY_SIC_CODE
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_PRIMARY_SIC_INDUSTRY
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_PICS_CODE
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_GICS_CODE
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_PRIMARY_INDUSTRY
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_INDUSTRY_SECTOR
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_INDUSTRY_GROUP
+                    - function: GDSP
+                      identifier: IBM:NYSE
+                      mnemonic: IQ_INDUSTRY
+      responses:
+        '200':
+          $ref: './common.yaml#/common/components/responses/200'
+        '401':
+          $ref: './common.yaml#/common/components/responses/401'
+        '405':
+          $ref: './common.yaml#/common/components/responses/405'
+        '423':
+          $ref: './common.yaml#/common/components/responses/423'
+        'Note':
+          $ref: './common.yaml#/common/components/responses/Note'
+
+components:
+  schemas:
+    InputRequests:
+      $ref: './common.yaml#/common/components/schemas/InputRequests'
+    GDSSDKResponse:
+      $ref: './common.yaml#/common/components/schemas/GDSSDKResponse'
+  securitySchemes:
+    BearerScheme:
+      type: http
+      description: >-
+        Use
+        [Authenticate](/catalog-service/authenticate)
+        to generate the token.
+      scheme: bearer

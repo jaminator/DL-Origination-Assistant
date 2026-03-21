@@ -1,4 +1,4 @@
-"""Tests for PitchBook REST API v2 client."""
+"""Tests for PitchBook Premium Data REST API v2 client."""
 
 from unittest.mock import AsyncMock, patch
 
@@ -9,10 +9,11 @@ from app.miner.pitchbook.rest_client import (
     PitchBookRESTClient,
     _compute_name_confidence,
     _format_location,
-    _normalize_company_detail,
+    _normalize_company_bio,
     _normalize_company_search_result,
-    _normalize_competitor,
     _normalize_debt_deal,
+    _normalize_financials,
+    _normalize_similar_company,
 )
 
 # -- Normalizer unit tests -----------------------------------------------
@@ -51,9 +52,9 @@ class TestNormalizers:
     def test_format_location_empty(self):
         assert _format_location({}) == ""
 
-    def test_normalize_company_search_result(self):
+    def test_normalize_company_search_result_uses_pb_id(self):
         raw = {
-            "companyId": "123-45",
+            "pbId": "pb-123-45",
             "companyName": "Acme Corp",
             "ownershipStatus": "Privately Held",
             "primaryIndustrySector": "Industrials",
@@ -63,37 +64,54 @@ class TestNormalizers:
             "hqState": "TX",
         }
         result = _normalize_company_search_result(raw, "Acme Corp")
-        assert result["entity_id"] == "123-45"
+        assert result["entity_id"] == "pb-123-45"
         assert result["name"] == "Acme Corp"
         assert result["match_confidence"] == 1.0
         assert result["ownership_status"] == "Privately Held"
         assert result["employee_count"] == 250
 
-    def test_normalize_company_detail(self):
+    def test_normalize_company_search_result_falls_back_to_company_id(self):
         raw = {
             "companyId": "123-45",
+            "companyName": "Acme Corp",
+        }
+        result = _normalize_company_search_result(raw, "Acme Corp")
+        assert result["entity_id"] == "123-45"
+
+    def test_normalize_company_bio(self):
+        raw = {
+            "pbId": "pb-123-45",
             "companyName": "Acme Corp",
             "description": "Industrial company",
             "yearFounded": 2005,
             "ownershipStatus": "founder_owned",
-            "revenue": 75000000,
-            "ebitda": 12000000,
+            "financingStatus": "Generating Revenue",
+            "totalRaised": 25000000,
             "investors": [
                 {"investorId": "inv-1", "investorName": "GrowthCo"}
             ],
         }
-        detail = _normalize_company_detail(raw)
-        assert detail["entity_id"] == "123-45"
+        detail = _normalize_company_bio(raw)
+        assert detail["entity_id"] == "pb-123-45"
         assert detail["founded_year"] == 2005
         assert detail["ownership_type"] == "founder_owned"
-        assert detail["revenue"] == 75000000
+        assert detail["financing_status"] == "Generating Revenue"
+        assert detail["total_raised"] == 25000000
         assert len(detail["investors"]) == 1
 
-    def test_normalize_competitor(self):
-        raw = {"companyId": "789", "companyName": "Beta Inc", "employees": 100}
-        comp = _normalize_competitor(raw)
-        assert comp["entity_id"] == "789"
+    def test_normalize_similar_company(self):
+        raw = {
+            "pbId": "pb-789",
+            "companyName": "Beta Inc",
+            "employees": 100,
+            "similarityScore": 0.92,
+            "isCompetitor": True,
+        }
+        comp = _normalize_similar_company(raw)
+        assert comp["entity_id"] == "pb-789"
         assert comp["name"] == "Beta Inc"
+        assert comp["similarity_score"] == 0.92
+        assert comp["is_competitor"] is True
 
     def test_normalize_debt_deal(self):
         raw = {
@@ -107,6 +125,31 @@ class TestNormalizers:
         assert deal["facility_type"] == "Term Loan"
         assert deal["amount"] == 75000000
         assert deal["lender"] == "Big Bank"
+
+    def test_normalize_financials(self):
+        raw = {
+            "revenue": 80000000,
+            "ebitda": 16000000,
+            "ebit": 12000000,
+            "netIncome": 8000000,
+            "enterpriseValue": 400000000,
+            "totalDebt": 100000000,
+            "netDebt": 85000000,
+        }
+        fin = _normalize_financials(raw)
+        assert fin["revenue"] == 80000000.0
+        assert fin["ebitda"] == 16000000.0
+        assert fin["ebit"] == 12000000.0
+        assert fin["net_income"] == 8000000.0
+        assert fin["enterprise_value"] == 400000000.0
+        assert fin["total_debt"] == 100000000.0
+        assert fin["net_debt"] == 85000000.0
+
+    def test_normalize_financials_handles_nulls(self):
+        raw = {"revenue": None, "ebitda": None}
+        fin = _normalize_financials(raw)
+        assert fin["revenue"] is None
+        assert fin["ebitda"] is None
 
 
 # -- Client method tests (mocked HTTP) -----------------------------------
@@ -139,14 +182,14 @@ class TestPitchBookRESTClient:
             json={
                 "items": [
                     {
-                        "companyId": "pb-123",
+                        "pbId": "pb-123",
                         "companyName": "Acme Corp",
                         "ownershipStatus": "Privately Held",
                         "employees": 250,
                     }
                 ]
             },
-            request=httpx.Request("GET", "https://api.pitchbook.com/v2/companies"),
+            request=httpx.Request("GET", "https://api.pitchbook.com/v2/companies/search"),
         )
         with patch.object(
             httpx.AsyncClient, "request", new_callable=AsyncMock, return_value=mock_response
@@ -162,7 +205,7 @@ class TestPitchBookRESTClient:
         mock_response = httpx.Response(
             200,
             json={"items": []},
-            request=httpx.Request("GET", "https://api.pitchbook.com/v2/companies"),
+            request=httpx.Request("GET", "https://api.pitchbook.com/v2/companies/search"),
         )
         with patch.object(
             httpx.AsyncClient, "request", new_callable=AsyncMock, return_value=mock_response
@@ -171,44 +214,53 @@ class TestPitchBookRESTClient:
             assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_company_detail(self, client):
+    async def test_get_company_detail_calls_bio(self, client):
         mock_response = httpx.Response(
             200,
             json={
-                "companyId": "pb-123",
+                "pbId": "pb-123",
                 "companyName": "Acme Corp",
                 "yearFounded": 2005,
                 "ownershipStatus": "founder_owned",
-                "revenue": 75000000,
+                "financingStatus": "Generating Revenue",
             },
-            request=httpx.Request("GET", "https://api.pitchbook.com/v2/companies/pb-123"),
+            request=httpx.Request("GET", "https://api.pitchbook.com/v2/companies/pb-123/bio"),
         )
         with patch.object(
             httpx.AsyncClient, "request", new_callable=AsyncMock, return_value=mock_response
-        ):
+        ) as mock_req:
             detail = await client.get_company_detail("pb-123")
             assert detail["entity_id"] == "pb-123"
             assert detail["founded_year"] == 2005
-            assert detail["revenue"] == 75000000
+            assert detail["financing_status"] == "Generating Revenue"
+            # Verify the path is /bio
+            mock_req.assert_called_once()
+            call_args = mock_req.call_args
+            assert "/companies/pb-123/bio" in call_args[0][1]
 
     @pytest.mark.asyncio
-    async def test_get_competitors(self, client):
+    async def test_get_competitors_uses_similar_companies(self, client):
         mock_response = httpx.Response(
             200,
             json={
                 "items": [
-                    {"companyId": "c-1", "companyName": "Competitor A"},
-                    {"companyId": "c-2", "companyName": "Competitor B"},
+                    {"pbId": "c-1", "companyName": "Competitor A", "similarityScore": 0.92, "isCompetitor": True},
+                    {"pbId": "c-2", "companyName": "Competitor B", "similarityScore": 0.85, "isCompetitor": False},
                 ]
             },
-            request=httpx.Request("GET", "https://api.pitchbook.com/v2/companies/pb-123/competitors"),
+            request=httpx.Request("GET", "https://api.pitchbook.com/v2/companies/pb-123/similar-companies"),
         )
         with patch.object(
             httpx.AsyncClient, "request", new_callable=AsyncMock, return_value=mock_response
-        ):
+        ) as mock_req:
             comps = await client.get_competitors("pb-123")
             assert len(comps) == 2
             assert comps[0]["name"] == "Competitor A"
+            assert comps[0]["similarity_score"] == 0.92
+            assert comps[0]["is_competitor"] is True
+            # Verify the path is /similar-companies
+            call_args = mock_req.call_args
+            assert "/companies/pb-123/similar-companies" in call_args[0][1]
 
     @pytest.mark.asyncio
     async def test_get_competitors_error_returns_empty(self, client):
@@ -255,6 +307,100 @@ class TestPitchBookRESTClient:
         ):
             debts = await client.get_debt_details("pb-123")
             assert debts == []
+
+    @pytest.mark.asyncio
+    async def test_get_financials(self, client):
+        mock_response = httpx.Response(
+            200,
+            json={
+                "revenue": 80000000,
+                "ebitda": 16000000,
+                "totalDebt": 50000000,
+            },
+            request=httpx.Request("GET", "https://api.pitchbook.com/v2/companies/pb-123/financials"),
+        )
+        with patch.object(
+            httpx.AsyncClient, "request", new_callable=AsyncMock, return_value=mock_response
+        ) as mock_req:
+            fin = await client.get_financials("pb-123")
+            assert fin is not None
+            assert fin["revenue"] == 80000000.0
+            assert fin["ebitda"] == 16000000.0
+            assert fin["total_debt"] == 50000000.0
+            call_args = mock_req.call_args
+            assert "/companies/pb-123/financials" in call_args[0][1]
+
+    @pytest.mark.asyncio
+    async def test_get_financials_error_returns_none(self, client):
+        with patch.object(
+            httpx.AsyncClient,
+            "request",
+            new_callable=AsyncMock,
+            side_effect=httpx.RequestError("Network error"),
+        ):
+            fin = await client.get_financials("pb-123")
+            assert fin is None
+
+    @pytest.mark.asyncio
+    async def test_get_most_recent_debt_financing(self, client):
+        mock_response = httpx.Response(
+            200,
+            json={
+                "dealId": "d-100",
+                "seniority": "Senior Secured",
+                "security": "First Lien",
+                "spread": "S+450",
+                "maturityDate": "2028-12-31",
+                "dealSize": 75000000,
+                "closeDate": "2023-06-15",
+            },
+            request=httpx.Request("GET", "https://api.pitchbook.com/v2/companies/pb-123/most-recent-debt-financing"),
+        )
+        with patch.object(
+            httpx.AsyncClient, "request", new_callable=AsyncMock, return_value=mock_response
+        ):
+            df = await client.get_most_recent_debt_financing("pb-123")
+            assert df is not None
+            assert df["seniority"] == "Senior Secured"
+            assert df["spread"] == "S+450"
+            assert df["deal_size"] == 75000000.0
+
+    @pytest.mark.asyncio
+    async def test_get_active_investors(self, client):
+        mock_response = httpx.Response(
+            200,
+            json={
+                "items": [
+                    {"investorId": "inv-1", "investorName": "Growth Partners", "investorType": "PE"},
+                ]
+            },
+            request=httpx.Request("GET", "https://api.pitchbook.com/v2/companies/pb-123/active-investors"),
+        )
+        with patch.object(
+            httpx.AsyncClient, "request", new_callable=AsyncMock, return_value=mock_response
+        ):
+            investors = await client.get_active_investors("pb-123")
+            assert len(investors) == 1
+            assert investors[0]["name"] == "Growth Partners"
+
+    @pytest.mark.asyncio
+    async def test_get_similar_companies(self, client):
+        mock_response = httpx.Response(
+            200,
+            json={
+                "items": [
+                    {"pbId": "s-1", "companyName": "Similar A", "similarityScore": 0.94, "isCompetitor": True},
+                ]
+            },
+            request=httpx.Request("GET", "https://api.pitchbook.com/v2/companies/pb-123/similar-companies"),
+        )
+        with patch.object(
+            httpx.AsyncClient, "request", new_callable=AsyncMock, return_value=mock_response
+        ):
+            similar = await client.get_similar_companies("pb-123")
+            assert len(similar) == 1
+            assert similar[0]["entity_id"] == "s-1"
+            assert similar[0]["similarity_score"] == 0.94
 
     @pytest.mark.asyncio
     async def test_auth_headers(self, client):
