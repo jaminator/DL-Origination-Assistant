@@ -49,4 +49,12 @@ def assign_disposition(
         if company.revenue_estimate < 5.0:  # Under $5M — likely too small
             return Disposition.EXCLUDE
 
+        # Boundary zone: companies near the floor ($5M-$10M) or near the ceiling
+        # (within 10% of cascade anchor threshold) are uncertain — apply boundary_treatment
+        if boundary_treatment == "watch":
+            near_floor = company.revenue_estimate < 10.0
+            near_ceiling = company.revenue_estimate > cascade_anchor_threshold * 0.9
+            if near_floor or near_ceiling:
+                return Disposition.WATCH
+
     return Disposition.PRIMARY

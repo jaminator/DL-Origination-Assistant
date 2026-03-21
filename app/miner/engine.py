@@ -63,8 +63,19 @@ class MinerEngine:
         self._dedup_result: DedupResult | None = None
         self._review_items: list = []
 
-    async def execute_pipeline(self, run_id: UUID, config: dict, start_from: WorkflowStage | None = None) -> dict:
-        """Run the full borrower mining pipeline (or resume from a given stage)."""
+    async def execute_pipeline(
+        self,
+        run_id: UUID,
+        config: dict,
+        start_from: WorkflowStage | None = None,
+        stage_callback=None,
+    ) -> dict:
+        """Run the full borrower mining pipeline (or resume from a given stage).
+
+        Args:
+            stage_callback: Optional async callable(stage: WorkflowStage, company_count: int)
+                called after each stage completes. Used by the orchestrator for per-stage checkpointing.
+        """
         logger.info("miner_pipeline_start", run_id=str(run_id))
 
         stages = [
@@ -97,6 +108,9 @@ class MinerEngine:
             result = await handler(run_id, config)
             results[stage.value] = result
             logger.info("miner_stage_complete", stage=stage.value, run_id=str(run_id))
+
+            if stage_callback:
+                await stage_callback(stage, len(self._companies))
 
         logger.info("miner_pipeline_complete", run_id=str(run_id))
         return results

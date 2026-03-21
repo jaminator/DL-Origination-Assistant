@@ -69,6 +69,12 @@ class CapitalIQStatus(StrEnum):
     ERROR = "error"
 
 
+class ExportFormat(StrEnum):
+    CSV = "csv"
+    JSONL = "jsonl"
+    EXCEL = "excel"
+
+
 class WorkflowStage(StrEnum):
     THEME_INTAKE = "theme_intake"
     SUBVERTICAL_RECOMMENDATION = "subvertical_recommendation"

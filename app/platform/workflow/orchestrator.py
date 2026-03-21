@@ -50,7 +50,16 @@ class WorkflowOrchestrator:
 
             result = {}
             if miner_engine:
-                result = await miner_engine.execute_pipeline(run_id, config)
+                async def _on_stage_complete(stage: WorkflowStage, company_count: int) -> None:
+                    await self._save_checkpoint(
+                        run_id, stage.value,
+                        company_count=company_count,
+                        notes=f"Stage {stage.value} completed",
+                    )
+
+                result = await miner_engine.execute_pipeline(
+                    run_id, config, stage_callback=_on_stage_complete,
+                )
 
                 # Persist companies to DB
                 await self._persist_companies(run_id, miner_engine)
@@ -108,7 +117,16 @@ class WorkflowOrchestrator:
 
         result = {}
         if miner_engine:
-            result = await miner_engine.execute_pipeline(run_id, config, start_from=start_from)
+            async def _on_stage_complete(stage: WorkflowStage, company_count: int) -> None:
+                await self._save_checkpoint(
+                    run_id, stage.value,
+                    company_count=company_count,
+                    notes=f"Stage {stage.value} completed (resumed)",
+                )
+
+            result = await miner_engine.execute_pipeline(
+                run_id, config, start_from=start_from, stage_callback=_on_stage_complete,
+            )
             await self._persist_companies(run_id, miner_engine)
             await self._persist_review_items(miner_engine)
 
