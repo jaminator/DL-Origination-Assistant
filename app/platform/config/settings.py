@@ -31,8 +31,8 @@ class Settings(BaseSettings):
 
     # NAICS BizAPI
     bizapi_provider: str = "mock"  # "rest" or "mock"
-    bizapi_api_url: str = "https://api.naics.com/v1"
-    bizapi_sandbox_url: str = "https://sandbox.naics.com/v1"
+    bizapi_api_url: str = "https://naics.com/wp-json/naicsapi/v2/cosearch"
+    bizapi_sandbox_url: str = "https://www.naics.com/wp-json/naicsapi/v2/cosearchtest"
     bizapi_username: str = ""
     bizapi_password: SecretStr = SecretStr("")
     bizapi_use_sandbox: bool = True

@@ -329,12 +329,19 @@ class MinerEngine:
                 company.bizapi_duns = result.get("duns")
                 company.bizapi_match_method = result.get("match_method")
                 company.bizapi_match_confidence = result.get("match_confidence")
+                company.bizapi_match_grade = result.get("match_grade")
+                company.bizapi_location_type = result.get("location_type")
+                company.bizapi_employees_on_site = result.get("employees_on_site")
 
                 # Store source-specific fields
                 company.naics_code = result.get("naics_code") or company.naics_code
                 company.naics_description = result.get("naics_description") or company.naics_description
+                company.naics_code_2 = result.get("naics_code_2") or company.naics_code_2
+                company.naics_description_2 = result.get("naics_description_2") or company.naics_description_2
                 company.sic_code = result.get("sic_code") or company.sic_code
                 company.sic_description = result.get("sic_description") or company.sic_description
+                company.sic_code_2 = result.get("sic_code_2") or company.sic_code_2
+                company.sic_description_2 = result.get("sic_description_2") or company.sic_description_2
                 company.bizapi_year_started = result.get("year_started")
                 company.bizapi_employee_count = result.get("employee_count")
                 company.bizapi_sales_volume = result.get("sales_volume")
@@ -383,7 +390,9 @@ class MinerEngine:
 
                 # Corporate linkage → flag subsidiary
                 linkage = result.get("corporate_linkage", {})
-                if linkage.get("parent_duns"):
+                hq_parent = linkage.get("hq_parent", {})
+                parent_duns = hq_parent.get("parent_duns") if isinstance(hq_parent, dict) else None
+                if parent_duns:
                     company.review_required = True
                     if ReviewReason.ACQUISITION_MERGER not in company.review_reasons:
                         company.review_reasons.append(ReviewReason.ACQUISITION_MERGER)

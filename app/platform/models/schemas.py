@@ -139,10 +139,17 @@ class CompanyRecord(BaseModel):
     bizapi_duns: str | None = None
     bizapi_match_method: str | None = None
     bizapi_match_confidence: float | None = None
+    bizapi_match_grade: str | None = None  # 7-letter quality string e.g. "AAAAAZA"
+    bizapi_location_type: str | None = None  # Headquarters / Branch / Single Location
+    bizapi_employees_on_site: int | None = None
     naics_code: str | None = None
     naics_description: str | None = None
+    naics_code_2: str | None = None
+    naics_description_2: str | None = None
     sic_code: str | None = None
     sic_description: str | None = None
+    sic_code_2: str | None = None
+    sic_description_2: str | None = None
     bizapi_year_started: int | None = None
     bizapi_employee_count: int | None = None
     bizapi_sales_volume: float | None = None  # in millions

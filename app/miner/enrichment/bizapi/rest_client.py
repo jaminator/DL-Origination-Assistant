@@ -1,10 +1,12 @@
-"""NAICS BizAPI REST client.
+"""NAICS BizAPI V2 REST client.
 
-Implements the BizAPIAdapter interface using the NAICS BizAPI REST API.
+Implements the BizAPIAdapter interface using the real BizAPI V2 cosearch endpoint.
 
+API docs: BizAPI-V2-Documentation.pdf
+Endpoint: POST /wp-json/naicsapi/v2/cosearch (single endpoint, auto-detects match method)
 Authentication: HTTP Basic Auth (username/password) over SSL.
-Rate limit: 3 requests per rolling second (documented).
-Sandbox: Available at a separate URL for testing with real credentials.
+Rate limit: 3 requests per rolling second.
+Sandbox: POST /wp-json/naicsapi/v2/cosearchtest
 """
 
 from __future__ import annotations
@@ -23,24 +25,20 @@ from app.platform.utils.logging import get_logger
 
 logger = get_logger("miner.enrichment.bizapi")
 
-# Match method endpoint paths
-_MATCH_ENDPOINTS = {
-    "duns": "/match/duns",
-    "url": "/match/url",
-    "standard": "/match/standard",
-    "name": "/match/name",
-    "phone": "/match/phone",
-    "loose": "/match/loose",
-}
-
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class BizAPIRESTClient(BizAPIAdapter):
-    """BizAPI integration via REST API with Basic Auth.
+    """BizAPI V2 integration via the cosearch REST endpoint.
 
-    Supports 6 match methods: DUNS, URL, Standard, Name, Phone, Loose.
-    Enforces rate limiting at 3 requests per rolling second.
+    The API auto-detects the match method based on which fields are present
+    in the request body:
+      - duns only → DUNS Match (highest precision)
+      - url only → URL Match (US only)
+      - phone only → Phone Match
+      - companyName + address + city + state + postalCode + country → Standard Match
+      - companyName + state (minimum) → Loose Match
+      - companyName only → Name Match
     """
 
     def __init__(
@@ -70,7 +68,6 @@ class BizAPIRESTClient(BizAPIAdapter):
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
-                base_url=self._base_url,
                 headers=self._auth_headers(),
                 timeout=self._timeout,
             )
@@ -99,40 +96,40 @@ class BizAPIRESTClient(BizAPIAdapter):
             await asyncio.sleep(min_interval - elapsed)
         self._last_request_time = time.monotonic()
 
-    async def _request(
-        self,
-        method: str,
-        path: str,
-        json_body: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Execute an HTTP request with retry, backoff, and rate limiting."""
+    async def _request(self, json_body: dict[str, Any]) -> dict[str, Any]:
+        """POST to the cosearch endpoint with retry, backoff, and rate limiting."""
         await self._rate_limit()
         client = await self._get_client()
         last_exc: Exception | None = None
 
-        logger.info("bizapi_request_start", method=method, path=path)
+        logger.info("bizapi_request_start", url=self._base_url)
 
         for attempt in range(1, self._max_retries + 1):
             try:
-                response = await client.request(method, path, json=json_body)
+                response = await client.post(self._base_url, json=json_body)
 
                 if response.status_code == 429:
                     retry_after = float(response.headers.get("Retry-After", 1.0))
                     logger.warning(
                         "bizapi_rate_limited",
-                        path=path,
                         attempt=attempt,
                         retry_after=retry_after,
                     )
                     await asyncio.sleep(retry_after)
                     continue
 
+                if response.status_code == 403:
+                    logger.error("bizapi_no_credits", status=403)
+                    raise httpx.HTTPStatusError(
+                        "No credits remaining on BizAPI account",
+                        request=response.request,
+                        response=response,
+                    )
+
                 response.raise_for_status()
                 data = response.json()
                 logger.info(
                     "bizapi_request_complete",
-                    method=method,
-                    path=path,
                     status=response.status_code,
                     attempt=attempt,
                 )
@@ -142,7 +139,6 @@ class BizAPIRESTClient(BizAPIAdapter):
                 logger.error(
                     "bizapi_http_error",
                     status=exc.response.status_code,
-                    path=path,
                     attempt=attempt,
                 )
                 last_exc = exc
@@ -154,7 +150,6 @@ class BizAPIRESTClient(BizAPIAdapter):
             except httpx.RequestError as exc:
                 logger.error(
                     "bizapi_request_error",
-                    path=path,
                     error=str(exc),
                     attempt=attempt,
                 )
@@ -162,10 +157,10 @@ class BizAPIRESTClient(BizAPIAdapter):
                 await asyncio.sleep(2 ** attempt)
 
         raise RuntimeError(
-            f"BizAPI request failed after {self._max_retries} attempts: {path}"
+            f"BizAPI request failed after {self._max_retries} attempts"
         ) from last_exc
 
-    def _select_match_method(
+    def _build_request_body(
         self,
         company_name: str,
         *,
@@ -173,25 +168,43 @@ class BizAPIRESTClient(BizAPIAdapter):
         website: str | None = None,
         state: str | None = None,
         phone: str | None = None,
-    ) -> list[tuple[str, dict[str, Any]]]:
-        """Select match methods in priority order based on available data.
+    ) -> dict[str, str]:
+        """Build the cosearch POST body using camelCase field names.
 
-        Returns list of (method_name, request_body) tuples to try in order.
+        The API auto-detects match method from which fields are present:
+        - duns only → DUNS Match
+        - url only → URL Match
+        - phone only → Phone Match
+        - companyName + state + ... → Standard/Loose Match
+        - companyName only → Name Match
         """
-        methods: list[tuple[str, dict[str, Any]]] = []
+        body: dict[str, str] = {}
 
+        # Priority: if we have DUNS, send only that for highest precision
         if duns:
-            methods.append(("duns", {"DUNS": duns}))
-        if website:
-            methods.append(("url", {"URL": website}))
-        if state:
-            methods.append(("standard", {"CompanyName": company_name, "State": state}))
-        methods.append(("name", {"CompanyName": company_name}))
-        if phone:
-            methods.append(("phone", {"Phone": phone}))
-        methods.append(("loose", {"CompanyName": company_name}))
+            body["duns"] = duns
+            return body
 
-        return methods
+        # URL-only match
+        if website and not company_name:
+            body["url"] = website
+            return body
+
+        # Phone-only match
+        if phone and not company_name:
+            body["phone"] = phone
+            return body
+
+        # Standard/Loose/Name match: always include companyName
+        body["companyName"] = company_name
+        if state:
+            body["state"] = state
+        if website:
+            body["url"] = website
+        if phone:
+            body["phone"] = phone
+
+        return body
 
     async def match_company(
         self,
@@ -202,55 +215,42 @@ class BizAPIRESTClient(BizAPIAdapter):
         state: str | None = None,
         phone: str | None = None,
     ) -> dict | None:
-        """Match a company using cascading match methods."""
-        methods = self._select_match_method(
+        """Match a company via the BizAPI V2 cosearch endpoint.
+
+        Sends a single POST request. The API auto-detects the best match
+        method based on which fields are provided.
+        """
+        body = self._build_request_body(
             company_name, duns=duns, website=website, state=state, phone=phone,
         )
 
-        for method_name, body in methods:
-            path = _MATCH_ENDPOINTS[method_name]
-            try:
-                raw = await self._request("POST", path, json_body=body)
+        try:
+            raw = await self._request(json_body=body)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 401:
+                raise
+            logger.warning(
+                "bizapi_request_failed",
+                company=company_name,
+                status=exc.response.status_code,
+            )
+            return None
+        except RuntimeError:
+            logger.warning("bizapi_retries_exhausted", company=company_name)
+            return None
 
-                # BizAPI returns empty or null results for no match
-                if not raw or raw.get("MatchFound") is False or raw.get("match_found") is False:
-                    logger.info("bizapi_no_match", method=method_name, company=company_name)
-                    continue
+        result = normalize_match_response(raw)
+        if result is None:
+            logger.info("bizapi_no_match", company=company_name)
+            return None
 
-                raw["match_method"] = method_name
-                result = normalize_match_response(raw)
-
-                if result["match_confidence"] >= 0.50:
-                    logger.info(
-                        "bizapi_match_found",
-                        method=method_name,
-                        company=company_name,
-                        confidence=result["match_confidence"],
-                    )
-                    return result
-
-                logger.info(
-                    "bizapi_low_confidence",
-                    method=method_name,
-                    company=company_name,
-                    confidence=result["match_confidence"],
-                )
-
-            except RuntimeError:
-                logger.warning("bizapi_method_exhausted", method=method_name, company=company_name)
-                continue
-            except httpx.HTTPStatusError as exc:
-                if exc.response.status_code == 401:
-                    raise
-                logger.warning(
-                    "bizapi_method_failed",
-                    method=method_name,
-                    company=company_name,
-                    status=exc.response.status_code,
-                )
-                continue
-
-        return None
+        logger.info(
+            "bizapi_match_found",
+            company=company_name,
+            method=result["match_method"],
+            confidence=result["match_confidence"],
+        )
+        return result
 
     async def is_available(self) -> bool:
         return bool(self._base_url and self._username and self._password)
