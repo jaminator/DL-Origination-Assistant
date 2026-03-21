@@ -457,7 +457,7 @@ class MinerEngine:
                 company.pb_entity_id = search.get("entity_id")
                 matched += 1
 
-                # Get detail
+                # Get bio detail
                 if company.pb_entity_id:
                     detail = await self._pitchbook.get_company_detail(company.pb_entity_id)
                     if detail.get("ownership_type"):
@@ -473,6 +473,17 @@ class MinerEngine:
                             for inv in detail["investors"]
                         ]
 
+                    # Store additional bio fields
+                    company.pb_financing_status = detail.get("financing_status")
+                    company.pb_total_raised = detail.get("total_raised")
+                    company.pb_year_founded = detail.get("founded_year")
+                    company.pb_description = detail.get("description")
+
+                    # Financials
+                    financials = await self._pitchbook.get_financials(company.pb_entity_id)
+                    if financials:
+                        company.pb_financials = financials
+
                     # Debt details
                     debt = await self._pitchbook.get_debt_details(company.pb_entity_id)
                     if debt:
@@ -485,10 +496,14 @@ class MinerEngine:
                     else:
                         company.has_debt = False
 
-                    # Competitors (for cascade expansion)
-                    competitors = await self._pitchbook.get_competitors(company.pb_entity_id)
-                    if competitors:
-                        company.catalyst_flags.append(f"pb_competitors:{len(competitors)}")
+                    # Similar companies (for cascade expansion)
+                    similar = await self._pitchbook.get_similar_companies(company.pb_entity_id)
+                    if similar:
+                        company.catalyst_flags.append(f"pb_competitors:{len(similar)}")
+                        # Store best similarity score
+                        scores = [s.get("similarity_score") for s in similar if s.get("similarity_score") is not None]
+                        if scores:
+                            company.pb_similarity_score = max(scores)
 
                 company.workflow_stage = WorkflowStage.PITCHBOOK_ENRICHMENT
 

@@ -133,6 +133,12 @@ class CompanyRecord(BaseModel):
     close_date: date | None = None
     maturity_date: date | None = None
     catalyst_flags: list[str] = Field(default_factory=list)
+    pb_financials: dict | None = None  # revenue, ebitda, ebit, net_income, ev, total_debt, net_debt
+    pb_similarity_score: float | None = None  # from similar-companies endpoint
+    pb_financing_status: str | None = None  # e.g. "Generating Revenue"
+    pb_total_raised: float | None = None  # total money raised in millions
+    pb_year_founded: int | None = None
+    pb_description: str | None = None
 
     # BizAPI enrichment
     bizapi_status: BizAPIStatus = BizAPIStatus.PENDING
