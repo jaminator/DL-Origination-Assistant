@@ -2,15 +2,16 @@
 
 A production-grade platform for automating direct-lending origination target mining. Accepts investment themes, recommends lender-friendly sub-verticals, discovers and enriches borrower candidates, and exports scored outreach lists.
 
-**302 tests passing** | Python 3.11+ | FastAPI + SQLAlchemy 2.0 async | React 19 + TypeScript frontend | Mock-first local dev
+**316 tests passing** | Python 3.11+ | FastAPI + SQLAlchemy 2.0 async | React 19 + TypeScript frontend | Mock-first local dev
 
 ## Documentation
 
 - [Architecture Guide](docs/architecture.md) — Module layout, data flow, pipeline stages, design decisions
+- [API Reference](docs/api-reference.md) — Full endpoint documentation with request/response models
+- [Frontend Guide](docs/frontend.md) — React UI architecture, dev setup, component map
 - [Scoring and Dispositioning](docs/scoring-and-dispositioning.md) — Scoring formula, disposition rules, QA gates, dedup thresholds
 - [Operations Guide](docs/operations.md) — Setup, deployment, configuration, extending the platform
-- [PitchBook Integration Contract](docs/pitchbook_mcp_contract.md) — PitchBook REST/MCP API reference, tool schemas, data flow
-- [PitchBook MCP Discovery](docs/pitchbook_mcp_discovery.md) — MCP server discovery report and setup instructions
+- [PitchBook Integration](docs/integrations/pitchbook.md) — PitchBook REST/MCP API reference, tool schemas, data flow
 
 ## Architecture
 
@@ -41,7 +42,7 @@ A production-grade platform for automating direct-lending origination target min
 ```
 
 **Four layers:**
-- **React Frontend** — Guided workflow UI with 10 pages (Dashboard, RunSetup, SubVerticals, Sources, Pipeline, Companies, CompanyDetail, ReviewQueue, Exports, Settings)
+- **React Frontend** — Guided workflow UI with 10 pages. See [Frontend Guide](docs/frontend.md) for the React UI architecture.
 - **Recommender Engine** — Theme → sub-vertical ranking → source recommendations
 - **Miner Engine** — Source extraction → multi-source enrichment (BizAPI, PitchBook, Capital IQ) → dedup → scoring → export
 - **AI/MCP Layer** — LLM service abstraction, MCP connectors, prompt library, confidence tracking
@@ -127,64 +128,34 @@ docker compose up
 | `CAPITALIQ_PROVIDER` | `mock` | `mock` or `rest` (S&P Capital IQ) |
 | `DATABASE_URL` | (Docker default) | PostgreSQL connection string |
 | `AUTH_ENABLED` | `false` | Enable auth boundary |
+| `SERVE_FRONTEND` | `true` | Serve React frontend from `frontend/dist/` |
 
 ### Industry profiles:
 - `profiles/generic.yaml` — No industry-specific knowledge
 - `profiles/data_center.yaml` — Data center ecosystem hints and source templates
 
-## Workflow Stages
+## Workflow Overview
 
-### Phase 0-2: Recommendation (interactive)
-1. **Theme Intake** — User provides theme + optional constraints
-2. **Sub-vertical Recommendation** — AI generates ranked sub-verticals with fit scores
-3. **User Confirmation** — Accept/edit/add/remove sub-verticals
-4. **Source Recommendation** — AI generates sources + NAICS codes per sub-vertical
-5. **User Confirmation** — Accept/deselect/add sources
+The platform operates in two phases:
 
-### Phase 3: Mining (background pipeline, 12 stages)
-6. **Name Generation** — Extract companies from confirmed sources
-7. **Name Normalization** — Standardize names, fuzzy dedup
-8. **Web Enhancement** — AI-assisted enrichment (description, size, geography)
-9. **Dispositioning** — Primary / Cascade Anchor / Exclude / Watch
-10. **BizAPI Enrichment** — Company verification, DUNS, NAICS/SIC codes, firmographics
-11. **PitchBook Enrichment** — Ownership, debt, competitors via REST/MCP
-12. **Capital IQ Enrichment** — Private-market financials, credit metrics, M&A history
-13. **Cascade Expansion** — Recursive competitor discovery from anchors
-14. **Final Dedup** — Cross-source deduplication
-15. **QA Validation** — Outreach eligibility gates
-16. **Scoring** — Weighted borrower scoring with ownership bonuses
-17. **Export** — CSV, JSON, multi-sheet Excel outputs
+**Interactive (Recommender):** User provides a theme → AI generates sub-vertical recommendations → user confirms → AI generates source recommendations → user confirms.
 
-### Phase 4: Review
-- Review queue for ambiguous duplicates, unknown ownership, boundary cases, weak enrichment matches, conflicting enrichment data
-- Export downloads
+**Automated (Miner, 12 stages):** Name generation → normalization → web enhancement → dispositioning → BizAPI enrichment → PitchBook enrichment → Capital IQ enrichment → cascade expansion → final dedup → QA validation → scoring → export.
+
+See [Architecture Guide](docs/architecture.md) for the detailed stage-by-stage breakdown.
 
 ## API Reference
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/v1/health` | GET | Liveness probe (DB connectivity) |
-| `/api/v1/readiness` | GET | Readiness probe (DB + all connectors) |
-| `/api/v1/runs` | POST | Create new run |
-| `/api/v1/runs/{id}` | GET | Get run details |
-| `/api/v1/runs/{id}/status` | GET | Get run status |
-| `/api/v1/runs/{id}/recommend-subverticals` | POST | Generate recommendations |
-| `/api/v1/runs/{id}/confirm-subverticals` | POST | Lock selections |
-| `/api/v1/runs/{id}/recommend-sources` | POST | Generate source recommendations |
-| `/api/v1/runs/{id}/confirm-sources` | POST | Lock source selections |
-| `/api/v1/runs/{id}/execute` | POST | Start mining pipeline |
-| `/api/v1/runs/{id}/resume` | POST | Resume from checkpoint |
-| `/api/v1/runs/{id}/stages/{stage}/rerun` | POST | Re-run single stage |
-| `/api/v1/runs/{id}/companies` | GET | List companies |
-| `/api/v1/runs/{id}/companies/{company_id}` | GET | Get single company detail |
-| `/api/v1/runs/{id}/review-queue` | GET | List review items |
-| `/api/v1/runs/{id}/review-queue/{item_id}/resolve` | POST | Resolve a review item |
-| `/api/v1/runs/{id}/exports` | POST | Trigger export |
-| `/api/v1/runs/{id}/exports` | GET | List exports |
-| `/api/v1/runs/{id}/exports/{export_id}/download` | GET | Download export file |
-| `/api/v1/runs/{id}/checkpoints` | GET | List pipeline checkpoints |
-| `/api/v1/runs/{id}/checkpoints/{checkpoint_id}` | GET | Inspect checkpoint detail |
-| `/api/v1/connectors/status` | GET | Connector health report |
+See [API Reference](docs/api-reference.md) for full endpoint documentation.
+
+## Known Limitations
+
+- **PitchBook MCP client** — `MCPPitchBookClient` raises `NotImplementedError` on all methods. Use `PITCHBOOK_PROVIDER=rest` instead. MCP support is a Phase 8 target.
+- **Auth boundary** — Stub only. `get_current_user` returns a dummy user. `AUTH_ENABLED=true` raises `NotImplementedError`. No SSO/OAuth2 implementation.
+- **S3 storage** — `StorageBackend` interface exists but `S3Storage` is not implemented. Only `LocalStorage` works.
+- **Web scraping** — `WebScraperAdapter` and `DirectoryAdapter` have retry logic but no real source URLs are configured. Uses `MockSourceAdapter` by default.
+- **ARQ worker** — Requires Redis. When Redis is unavailable, pipeline execution falls back to synchronous inline execution.
+- **Frontend polling loop** — If the pipeline crashes without updating run status to `failed`, the Pipeline page continues polling indefinitely. Workaround: refresh the page or start a new run.
 
 ## Extending
 
@@ -196,9 +167,8 @@ Create `profiles/your_industry.yaml` following the structure in `data_center.yam
 2. Register it in `app.miner.sources.registry.SourceRegistry`
 
 ### Swap PitchBook adapter
-1. Set `PITCHBOOK_PROVIDER=rest` (or `mcp`) in `.env`
-2. For REST: set `PITCHBOOK_API_KEY`
-3. For MCP: set `MCP_PITCHBOOK_URL` and `MCP_PITCHBOOK_TOKEN`
+1. Set `PITCHBOOK_PROVIDER=rest` in `.env`
+2. Set `PITCHBOOK_API_KEY`
 
 ### Enable BizAPI enrichment
 1. Set `BIZAPI_PROVIDER=rest` in `.env`
@@ -233,7 +203,7 @@ cp .env.example .env
 ### Running Tests
 
 ```bash
-# All 302 tests (no external services needed)
+# All 316 tests (no external services needed)
 pytest tests/ -v
 
 # By category
@@ -264,6 +234,8 @@ uvicorn app.main:app --reload
 ```
 
 ### Frontend Development
+
+See [Frontend Guide](docs/frontend.md) for the React UI architecture.
 
 ```bash
 cd frontend

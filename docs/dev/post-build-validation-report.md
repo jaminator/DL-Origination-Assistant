@@ -1,3 +1,7 @@
+> **Historical Record** — This is a point-in-time development audit (2026-03-18,
+> Phase 7 closeout). It is not a live status document. For current implementation status,
+> see [architecture.md](../architecture.md). For current project context, see [CLAUDE.md](../../CLAUDE.md).
+
 # Post-Build Validation Report
 
 **Date:** 2026-03-18

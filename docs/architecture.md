@@ -216,7 +216,7 @@ Stage 3: web_enhancement
   (city, state, revenue, ownership, exposure, employees)
      │
 Stage 4: dispositioning
-  CompanyRecord[] → assign_disposition() → PRIMARY | CASCADE_ANCHOR | EXCLUDE
+  CompanyRecord[] → assign_disposition() → PRIMARY | CASCADE_ANCHOR | EXCLUDE | WATCH
      │
 Stage 5: bizapi_enrichment
   Eligible → BizAPIAdapter → DUNS, NAICS/SIC, verified address, firmographics
@@ -337,7 +337,9 @@ tests/
 └── conftest.py              # Shared fixtures
 ```
 
-All 302 tests run with `pytest tests/ -v` — no external services required.
+All 316 tests run with `pytest tests/ -v` — no external services required.
+
+For frontend architecture details, see [Frontend Guide](frontend.md).
 
 ## Implementation Status
 
@@ -363,7 +365,7 @@ All 302 tests run with `pytest tests/ -v` — no external services required.
 | Fuzzy dedup (RapidFuzz) | **Complete** | Configurable thresholds, merge vs review routing |
 | Deterministic dispositioning | **Complete** | Revenue/geography/public-company rules |
 | Company scoring | **Complete** | 6-factor weighted formula with ownership bonuses |
-| QA validation gates | **Complete** | 6 checks: cascade bleed, unknown ownership, mega-cap, completeness, geography, stale data |
+| QA validation gates | **Complete** | 6 checks: cascade bleed, unknown ownership, mega-cap, completeness, geography, score sanity |
 | Review queue generation | **Complete** | From dedup ambiguity + QA failures |
 | Export (CSV, JSONL, Excel) | **Complete** | Multi-sheet Excel with outreach + capital structure tabs |
 | Checkpoint save/load | **Complete** | JSON serialization via LocalStorage |
