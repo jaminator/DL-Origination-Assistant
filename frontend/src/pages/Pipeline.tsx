@@ -60,7 +60,7 @@ export function Pipeline() {
     queryKey: ['checkpoints', runId],
     queryFn: () => api.listCheckpoints(runId!),
     enabled: !!runId,
-    refetchInterval: (query) => {
+    refetchInterval: (_query) => {
       return run?.status === 'running' ? 5000 : false;
     },
   });

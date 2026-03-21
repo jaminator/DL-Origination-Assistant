@@ -157,22 +157,22 @@ export function CompanyDetail({ runId, companyId }: Props) {
         <Card>
           <CardTitle>Ownership & Capital Structure</CardTitle>
           <CardContent>
-            {d.sponsor_names?.length > 0 && (
+            {(d.sponsor_names?.length ?? 0) > 0 && (
               <div className="mb-2">
                 <span className="text-xs text-slate-500">Sponsors: </span>
-                {d.sponsor_names.map((s, i) => <Badge key={i} variant="outline" className="mr-1">{s}</Badge>)}
+                {d.sponsor_names?.map((s, i) => <Badge key={i} variant="outline" className="mr-1">{s}</Badge>)}
               </div>
             )}
-            {d.investor_names?.length > 0 && (
+            {(d.investor_names?.length ?? 0) > 0 && (
               <div className="mb-2">
                 <span className="text-xs text-slate-500">Investors: </span>
-                {d.investor_names.map((s, i) => <Badge key={i} variant="outline" className="mr-1">{s}</Badge>)}
+                {d.investor_names?.map((s, i) => <Badge key={i} variant="outline" className="mr-1">{s}</Badge>)}
               </div>
             )}
-            {d.lender_names?.length > 0 && (
+            {(d.lender_names?.length ?? 0) > 0 && (
               <div className="mb-2">
                 <span className="text-xs text-slate-500">Lenders: </span>
-                {d.lender_names.map((s, i) => <Badge key={i} variant="outline" className="mr-1">{s}</Badge>)}
+                {d.lender_names?.map((s, i) => <Badge key={i} variant="outline" className="mr-1">{s}</Badge>)}
               </div>
             )}
             {d.has_debt && (

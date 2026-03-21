@@ -166,9 +166,9 @@ export function Sources() {
                               </a>
                             </p>
                           )}
-                          {src.mapped_subverticals?.length > 0 && (
+                          {(src.mapped_subverticals?.length ?? 0) > 0 && (
                             <div className="flex flex-wrap gap-1 mt-2">
-                              {src.mapped_subverticals.map((sv, i) => (
+                              {src.mapped_subverticals?.map((sv, i) => (
                                 <Badge key={i} variant="muted">{sv}</Badge>
                               ))}
                             </div>
